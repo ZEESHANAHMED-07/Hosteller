@@ -64,8 +64,7 @@ export default function Page() {
           <View className="flex-row flex-wrap gap-3">
             <TouchableOpacity 
               className="flex-1 bg-white rounded-xl p-4 shadow-sm border border-gray-100 min-w-[45%]"
-              onPress={() => router.push('/cards/createcards')}
-            >
+              onPress={() => router.push('/cards')}>
               <View className="w-10 h-10 bg-blue-100 rounded-full items-center justify-center mb-3">
                 <Ionicons name="card-outline" size={24} color="#3B82F6" />
               </View>
@@ -73,7 +72,9 @@ export default function Page() {
               <Text className="text-gray-600 text-xs">Create your travel card</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity className="flex-1 bg-white rounded-xl p-4 shadow-sm border border-gray-100 min-w-[45%]">
+            <TouchableOpacity 
+            className="flex-1 bg-white rounded-xl p-4 shadow-sm border border-gray-100 min-w-[45%]"
+            onPress={() => router.push('/sharing')}>
               <View className="w-10 h-10 bg-green-100 rounded-full items-center justify-center mb-3">
                 <Ionicons name="add-circle-outline" size={24} color="#059669" />
               </View>

@@ -11,6 +11,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../config/firebaseConfig'
 
 interface TravelerData {
   fullName: string;
@@ -69,8 +71,19 @@ export default function CreateCardScreen() {
     setIsLoading(true);
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Save to Firebase Firestore
+      const docRef = await addDoc(collection(db, 'travelerCards'), {
+        fullName: formData.fullName.trim(),
+        email: formData.email.trim().toLowerCase(),
+        phone: formData.phone.trim(),
+        country: formData.country.trim(),
+        bio: formData.bio.trim(),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        isActive: true,
+      });
+
+      console.log('Document written with ID: ', docRef.id);
       
       Alert.alert(
         'Success!',
@@ -83,7 +96,11 @@ export default function CreateCardScreen() {
         ]
       );
     } catch (error) {
-      Alert.alert('Error', 'Failed to create card. Please try again.');
+      console.error('Error adding document: ', error);
+      Alert.alert(
+        'Error', 
+        'Failed to create card. Please check your internet connection and try again.'
+      );
     } finally {
       setIsLoading(false);
     }
@@ -275,7 +292,7 @@ export default function CreateCardScreen() {
           {/* Tips */}
           <View className="mt-6 bg-blue-50 rounded-xl p-4">
             <View className="flex-row items-center mb-2">
-              <Ionicons className="lightbulb" size={16} color="#3B82F6" />
+              <Ionicons name="bulb" size={16} color="#3B82F6" />
               <Text className="text-blue-800 font-medium ml-2">Tips for a great card</Text>
             </View>
             <Text className="text-blue-700 text-sm leading-5">
