@@ -2,6 +2,7 @@ import { BleManager, Device } from 'react-native-ble-plx';
 import { Buffer } from 'buffer';
 
 import { BLE_CONFIG, BLEUtils } from './utils/bleUtils';
+import { ensureBlePermissions } from './utils/permissions';
 
 export type ReadyAdvertPayload = {
   t: 'READY';
@@ -44,6 +45,10 @@ function parseReadyPayloadFromManufacturerData(base64?: string): ReadyAdvertPayl
   if (!base64) return undefined;
   try {
     const bytes = Buffer.from(base64, 'base64');
+    // Compact marker support: single byte 'R' indicates READY
+    if (bytes.length === 1 && String.fromCharCode(bytes[0]) === 'R') {
+      return { t: 'READY', uid: '', ts: Date.now() };
+    }
     const json = bytes.toString('utf8');
     const parsed = JSON.parse(json);
     if (parsed && parsed.t === 'READY' && typeof parsed.uid === 'string') {
@@ -64,62 +69,106 @@ export function startPeerScan(
   const { onUpdate, onError } = callbacks;
   const { maxDistanceMeters, minRssi = -95, timeoutMs = BLE_CONFIG.SCAN_TIMEOUT } = options;
 
-  try {
-    bleManager.startDeviceScan(null, null, (error, device) => {
-      if (error) {
-        onError?.(error);
+  let timeoutId: any;
+  let stopped = false;
+
+  // Kick off asynchronously so callers don't need to await
+  (async () => {
+    try {
+      console.log('[BLE][scan] requesting permissions...');
+      const granted = await ensureBlePermissions();
+      console.log('[BLE][scan] permissions granted?', granted);
+      if (!granted) {
+        onError?.(new Error('Bluetooth permissions not granted'));
         return;
       }
-      if (!device) return;
+      if (stopped) return;
+      console.log('[BLE][scan] starting device scan (low-latency, allowDuplicates)');
+      bleManager.startDeviceScan(
+        null,
+        // Use low-latency to get results quicker and duplicates to keep RSSI fresh
+        { allowDuplicates: true, scanMode: 2 /* ScanMode.LowLatency */ },
+        (error, device) => {
+          if (error) {
+            onError?.(error);
+            return;
+          }
+          if (!device) return;
 
-      const rssi = device.rssi ?? -100;
-      if (rssi < minRssi) return;
+          const rssi = device.rssi ?? -100;
+          if (rssi < minRssi) return;
 
-      const payload = parseReadyPayloadFromManufacturerData((device as any).manufacturerData);
-      if (!payload) return; // only list devices advertising READY (receivers)
+          const mfg = (device as any).manufacturerData as string | undefined;
+          if (!mfg) {
+            // Helpful debug to confirm scan is seeing the broadcaster at all
+            console.log('[BLE][scan] device seen without manufacturerData', {
+              id: device.id,
+              name: device.name,
+              rssi,
+              serviceUUIDs: (device as any).serviceUUIDs,
+            });
+          }
 
-      const distance = estimateDistanceFromRssi(rssi);
-      if (typeof maxDistanceMeters === 'number' && distance > maxDistanceMeters) return;
+          let payload = parseReadyPayloadFromManufacturerData(mfg);
+          if (!payload) {
+            // Fallback: if serviceUUIDs include our SERVICE_UUID, treat as READY
+            const uuids: string[] | undefined = (device as any).serviceUUIDs;
+            const target = BLE_CONFIG.SERVICE_UUID?.toLowerCase();
+            const hasService = Array.isArray(uuids) && !!target && uuids.some(u => (u || '').toLowerCase() === target);
+            if (hasService) {
+              console.log('[BLE][scan] fallback READY via serviceUUID match for device', device.id);
+              payload = { t: 'READY', uid: '', ts: Date.now() };
+            } else {
+              // Debug non-matching mfg to verify content length
+              if (mfg) {
+                try {
+                  const bytes = Buffer.from(mfg, 'base64');
+                  console.log('[BLE][scan] non-ready mfg len', bytes.length, 'firstByte', bytes[0]);
+                } catch {}
+              }
+              return; // only list devices advertising READY (receivers)
+            }
+          }
 
-      const entry: ScannedPeer = {
-        id: device.id,
-        name: device.name ?? null,
-        rssi,
-        distanceMeters: distance,
-        payload,
-        device,
-      };
-      peers[device.id] = entry;
-      onUpdate?.(Object.values(peers).sort((a, b) => (b.rssi - a.rssi)));
-    });
+          const distance = estimateDistanceFromRssi(rssi);
+          if (typeof maxDistanceMeters === 'number' && distance > maxDistanceMeters) return;
 
-    let timeoutId: any;
-    if (timeoutMs && timeoutMs > 0) {
-      timeoutId = setTimeout(() => {
-        try {
-          bleManager.stopDeviceScan();
-        } catch {}
-      }, timeoutMs);
-    }
-
-    return {
-      stop: async () => {
-        if (timeoutId) clearTimeout(timeoutId);
-        try {
-          bleManager.stopDeviceScan();
-        } catch (e) {
-          onError?.(e);
+          const entry: ScannedPeer = {
+            id: device.id,
+            name: device.name ?? null,
+            rssi,
+            distanceMeters: distance,
+            payload,
+            device,
+          };
+          peers[device.id] = entry;
+          const list = Object.values(peers).sort((a, b) => (b.rssi - a.rssi));
+          console.log('[BLE][scan] READY peers update count=', list.length);
+          onUpdate?.(list);
         }
-      },
-    };
-  } catch (e) {
-    onError?.(e);
-    return {
-      stop: async () => {
-        try { bleManager.stopDeviceScan(); } catch {}
-      },
-    };
-  }
+      );
+
+      if (timeoutMs && timeoutMs > 0) {
+        timeoutId = setTimeout(() => {
+          try { bleManager.stopDeviceScan(); } catch {}
+        }, timeoutMs);
+      }
+    } catch (e) {
+      onError?.(e);
+    }
+  })();
+
+  return {
+    stop: async () => {
+      stopped = true;
+      if (timeoutId) clearTimeout(timeoutId);
+      try {
+        bleManager.stopDeviceScan();
+      } catch (e) {
+        onError?.(e);
+      }
+    },
+  };
 }
 
 export async function connectAndSendCard(

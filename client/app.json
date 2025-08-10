@@ -11,11 +11,15 @@
       "supportsTablet": true
     },
     "android": {
+      "compileSdkVersion": 35,
+      "targetSdkVersion": 35,
+      "minSdkVersion": 24,
       "permissions": [
         "android.permission.BLUETOOTH_ADVERTISE",
         "android.permission.BLUETOOTH_SCAN",
         "android.permission.BLUETOOTH_CONNECT",
-        "android.permission.ACCESS_FINE_LOCATION"
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
       ],
       "edgeToEdgeEnabled": true,
       "package": "com.anonymous.client"

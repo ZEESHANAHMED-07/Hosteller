@@ -79,15 +79,26 @@ export default function BLESenderScreen() {
   const toggleScan = async () => {
     try {
       if (!isScanning) {
+        console.log('[BLE][scan] starting scan...');
         setTransmissionStatus('Scanning for receivers nearby...');
         const ctl = startPeerScan(
           bleManager,
-          { onUpdate: setPeers, onError: e => console.warn('scan error', e) },
+          {
+            onUpdate: (list) => {
+              setPeers(list);
+              try {
+                const summary = list.map(p => `${p.name || 'User'}(${p.id.slice(-4)}) rssi=${p.rssi}`).join(', ');
+                console.log(`[BLE][scan] peers=${list.length}:`, summary || '(none)');
+              } catch {}
+            },
+            onError: e => console.warn('[BLE][scan] error', e),
+          },
           { maxDistanceMeters: 100, minRssi: -95, timeoutMs: 10000 }
         );
         scanCtlRef.current = ctl;
         setIsScanning(true);
       } else {
+        console.log('[BLE][scan] stopping scan...');
         await scanCtlRef.current?.stop();
         scanCtlRef.current = null;
         setIsScanning(false);
@@ -238,6 +249,9 @@ export default function BLESenderScreen() {
               {isScanning ? 'Stop Scanning' : 'Scan Others Nearby'}
             </Text>
           </TouchableOpacity>
+          {!!peers.length && (
+            <Text className="text-gray-600 mt-2">Found {peers.length} user{peers.length === 1 ? '' : 's'}</Text>
+          )}
         </View>
       </View>
 
