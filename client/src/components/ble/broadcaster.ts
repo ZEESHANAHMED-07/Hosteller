@@ -20,8 +20,8 @@ export async function startBroadcasting(userId: string): Promise<void> {
   console.log('[BLE][broadcast] startBroadcasting called with userId:', userId);
 
   // Use a tiny payload to stay under 31-byte legacy advertising limit
-  // We'll send a single-byte marker 'R' to indicate READY.
-  const payloadMarker = 'R';
+  // We'll send only the first letter of the user's name.
+  const firstLetter = String(userId).trim().charAt(0) || '?';
 
   // Prefer native advertiser on Android
   if (Platform.OS === 'android' && RNAdvertiser) {
@@ -30,9 +30,10 @@ export async function startBroadcasting(userId: string): Promise<void> {
       const granted = await ensureBlePermissions();
       console.log('[BLE][broadcast] permissions granted?', granted);
       if (!granted) throw new Error('Bluetooth permissions not granted');
-      // Manufacturer data set to single-byte 'R' to avoid 0-length edge cases
-      const manufacturerData: number[] = [ 'R'.charCodeAt(0) ];
-      console.log('[BLE][broadcast] manufacturerData length:', manufacturerData.length, manufacturerData);
+      // Manufacturer data: single byte = first letter (uppercase)
+      const letter = firstLetter.toUpperCase();
+      const manufacturerData: number[] = [ letter.charCodeAt(0) ];
+      console.log('[BLE][broadcast] advertising letter:', letter, 'code:', manufacturerData[0]);
 
       // Use a default company ID (0xFFFF is reserved for testing)
       const manufacturerId = 0xffff;

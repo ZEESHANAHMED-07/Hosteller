@@ -87,7 +87,11 @@ export default function BLESenderScreen() {
             onUpdate: (list) => {
               setPeers(list);
               try {
-                const summary = list.map(p => `${p.name || 'User'}(${p.id.slice(-4)}) rssi=${p.rssi}`).join(', ');
+                const display = (p: ScannedPeer) => {
+                  const ch = (p.payload?.uid?.trim()?.charAt(0) || p.name?.trim()?.charAt(0) || 'U');
+                  return ch.toUpperCase();
+                };
+                const summary = list.map(p => `${display(p)}(${p.id.slice(-4)}) rssi=${p.rssi}`).join(', ');
                 console.log(`[BLE][scan] peers=${list.length}:`, summary || '(none)');
               } catch {}
             },
@@ -186,7 +190,9 @@ export default function BLESenderScreen() {
             <Ionicons name="radio" size={20} color="#3B82F6" />
           </View>
           <View>
-            <Text className="text-gray-900 font-semibold">{item.name || 'Nearby User'}</Text>
+            <Text className="text-gray-900 font-semibold">{
+              (item.payload?.uid?.trim()?.charAt(0) || item.name?.trim()?.charAt(0) || 'U').toUpperCase()
+            }</Text>
             <Text className="text-gray-500 text-xs">RSSI {item.rssi} dBm {item.distanceMeters ? `· ~${item.distanceMeters.toFixed(1)}m` : ''}</Text>
           </View>
         </View>

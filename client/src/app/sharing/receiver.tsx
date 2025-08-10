@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { startBroadcasting, stopBroadcasting, isAdvertising as getAdvertising } from '../../components/ble/broadcaster';
+import { useUser } from '@clerk/clerk-expo';
 import { router } from 'expo-router';
 
 // Receiver screen only toggles broadcasting; no card or scanning logic here.
@@ -9,6 +10,7 @@ import { router } from 'expo-router';
 export default function BLEReceiverScreen() {
   const [scanStatus, setScanStatus] = useState<string>('');
   const [isBroadcasting, setIsBroadcasting] = useState<boolean>(false);
+  const { user, isLoaded, isSignedIn } = useUser();
 
   // Initialize current advertising state when screen mounts
   // (native advertiser may set this outside React's state)
@@ -21,9 +23,13 @@ export default function BLEReceiverScreen() {
   const onToggleBroadcast = async () => {
     try {
       if (!isBroadcasting) {
-        // TODO: replace with actual authenticated user id
-        const userId = 'debug-user-id';
-        await startBroadcasting(userId);
+        if (!isLoaded || !isSignedIn || !user) {
+          Alert.alert('Sign In Required', 'Please sign in to start receiving.');
+          return;
+        }
+        const source = (user.firstName || user.username || user.primaryEmailAddress?.emailAddress || 'User').trim();
+        const initial = source.charAt(0) || '?';
+        await startBroadcasting(initial);
         setIsBroadcasting(true);
         setScanStatus('Receiving On — You are visible to others nearby.');
       } else {

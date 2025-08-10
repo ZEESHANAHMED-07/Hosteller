@@ -45,8 +45,30 @@ function parseReadyPayloadFromManufacturerData(base64?: string): ReadyAdvertPayl
   if (!base64) return undefined;
   try {
     const bytes = Buffer.from(base64, 'base64');
+    // Many platforms include a 2-byte Company ID prefix in manufacturerData.
+    // Our advertiser sets companyId=0xFFFF and then app payload bytes.
+    const data = bytes.length >= 3 ? bytes.subarray(2) : bytes;
+    
+    // New format: single-letter (A-Z/a-z) indicates READY with that letter as name initial
+    if (data.length === 1) {
+      const code = data[0];
+      const isLetter = (code >= 65 && code <= 90) || (code >= 97 && code <= 122);
+      if (isLetter) {
+        const letter = String.fromCharCode(code).toUpperCase();
+        console.log('[BLE][scan] parsed single-letter READY payload', letter);
+        return { t: 'READY', uid: letter, ts: Date.now() };
+      }
+    }
+    // Backward compatible format: 'R' + UTF-8(name)
+    if (data.length >= 1 && String.fromCharCode(data[0]) === 'R') {
+      if (data.length > 1) {
+        const name = Buffer.from(data.subarray(1)).toString('utf8');
+        return { t: 'READY', uid: name, ts: Date.now() };
+      }
+      return { t: 'READY', uid: '', ts: Date.now() };
+    }
     // Compact marker support: single byte 'R' indicates READY
-    if (bytes.length === 1 && String.fromCharCode(bytes[0]) === 'R') {
+    if (data.length === 1 && String.fromCharCode(data[0]) === 'R') {
       return { t: 'READY', uid: '', ts: Date.now() };
     }
     const json = bytes.toString('utf8');
