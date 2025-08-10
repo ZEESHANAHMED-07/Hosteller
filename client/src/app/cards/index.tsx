@@ -20,6 +20,10 @@ export default function CardManagementScreen() {
     router.push('/cards/mycards');
   };
 
+  const handleHome = () => {
+    router.push('/');
+  };
+
   return (
     <View className="flex-1 bg-gradient-to-br from-slate-50 to-blue-50">
       {/* Header */}
@@ -123,6 +127,26 @@ export default function CardManagementScreen() {
                     <Text className="text-blue-700 text-sm font-medium">📊 View stats</Text>
                     <Text className="text-blue-700 text-sm font-medium">🔄 Share easily</Text>
                   </View>
+                </View>
+              </TouchableOpacity>
+
+              {/* Home Button */}
+              <TouchableOpacity
+                onPress={handleHome}
+                className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100"
+                activeOpacity={0.8}
+              >
+                <View className="flex-row items-center">
+                  <View className="w-16 h-16 bg-gradient-to-br from-gray-400 to-slate-500 rounded-2xl items-center justify-center mr-4 shadow-md">
+                    <Ionicons name="home" size={32} color="white" />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-2xl font-bold text-gray-900 mb-1">Home</Text>
+                    <Text className="text-gray-600 text-sm leading-5">
+                      Go back to the main screen
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={24} color="#9CA3AF" />
                 </View>
               </TouchableOpacity>
             </View>

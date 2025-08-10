@@ -10,15 +10,13 @@ import { router } from 'expo-router';
 
 export default function SharingIndexScreen() {
   const handleReceive = () => {
-    // Navigate to receive/scan page
-    console.log('Navigate to receive page');
-    // router.push('/receive');
+    // Navigate to receiver (scanner)
+    router.push('/sharing/receiver');
   };
 
   const handleSend = () => {
-    // Navigate to send/share page
-    console.log('Navigate to send page');
-    // router.push('/send');
+    // Navigate to sender (broadcaster)
+    router.push('/sharing/sender');
   };
 
   return (
