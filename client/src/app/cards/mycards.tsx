@@ -10,21 +10,21 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { collection, getDocs, query, orderBy, deleteDoc, doc } from 'firebase/firestore';
-import { db } from '../config/firebaseConfig';
+import { db, auth } from '../config/firebaseConfig';
 import { router } from 'expo-router';
 
-interface TravelerCard {
+interface UserCard {
   id: string;
-  fullName: string;
-  email: string;
-  phone: string;
-  country: string;
-  bio: string;
+  type: 'personal' | 'work' | 'social' | string;
+  title: string;
+  phone?: string;
+  email?: string;
+  socialLinks?: string[];
   createdAt?: any;
 }
 
 export default function MyCardsScreen() {
-  const [cards, setCards] = useState<TravelerCard[]>([]);
+  const [cards, setCards] = useState<UserCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,12 +32,18 @@ export default function MyCardsScreen() {
   const fetchCards = async () => {
     try {
       setError(null);
-      const q = query(collection(db, 'travelerCards'), orderBy('createdAt', 'desc'));
+      if (!auth.currentUser) {
+        setCards([]);
+        setLoading(false);
+        return;
+      }
+      const uid = auth.currentUser.uid;
+      const q = query(collection(db, 'users', uid, 'cards'), orderBy('createdAt', 'desc'));
       const querySnapshot = await getDocs(q);
-      const data: TravelerCard[] = querySnapshot.docs.map(doc => ({ 
-        id: doc.id, 
-        ...doc.data() 
-      })) as TravelerCard[];
+      const data: UserCard[] = querySnapshot.docs.map(d => ({
+        id: d.id,
+        ...(d.data() as Omit<UserCard, 'id'>),
+      }));
       setCards(data);
     } catch (err: any) {
       console.error('Error fetching cards:', err);
@@ -68,7 +74,8 @@ export default function MyCardsScreen() {
           style: 'destructive', 
           onPress: async () => {
             try {
-              await deleteDoc(doc(db, 'travelerCards', cardId));
+              if (!auth.currentUser) return Alert.alert('Error', 'Not authenticated');
+              await deleteDoc(doc(db, 'users', auth.currentUser.uid, 'cards', cardId));
               setCards(prev => prev.filter(card => card.id !== cardId));
               Alert.alert('Success', 'Card deleted successfully');
             } catch (error) {
@@ -86,8 +93,8 @@ export default function MyCardsScreen() {
     // router.push(`/edit-card/${cardId}`);
   };
 
-  const handleShareCard = (card: TravelerCard) => {
-    console.log('Share card:', card.fullName);
+  const handleShareCard = (card: UserCard) => {
+    console.log('Share card:', card.title);
     // Implement share functionality
   };
 
@@ -103,7 +110,7 @@ export default function MyCardsScreen() {
     return gradients[index % gradients.length];
   };
 
-  const renderItem = ({ item, index }: { item: TravelerCard; index: number }) => (
+  const renderItem = ({ item, index }: { item: UserCard; index: number }) => (
     <View className="mb-6">
       {/* Main Card */}
       <View className={`bg-gradient-to-br ${getCardGradient(index)} rounded-3xl p-6 shadow-xl`}>
@@ -113,8 +120,8 @@ export default function MyCardsScreen() {
               <Ionicons name="person" size={32} color="white" />
             </View>
             <View className="flex-1">
-              <Text className="text-white font-bold text-xl">{item.fullName}</Text>
-              <Text className="text-white/80 text-sm">{item.country}</Text>
+              <Text className="text-white font-bold text-xl">{item.title}</Text>
+              <Text className="text-white/80 text-sm capitalize">{item.type}</Text>
             </View>
           </View>
           
@@ -135,22 +142,30 @@ export default function MyCardsScreen() {
           </View>
         </View>
         
-        <Text className="text-white/90 text-sm mb-4 leading-5" numberOfLines={2}>
-          {item.bio}
-        </Text>
+        {item.socialLinks && item.socialLinks.length > 0 ? (
+          <Text className="text-white/90 text-sm mb-4 leading-5" numberOfLines={2}>
+            {item.socialLinks.join(', ')}
+          </Text>
+        ) : null}
         
         <View className="flex-row justify-between items-center">
           <View className="flex-row items-center">
             <Ionicons name="mail" size={14} color="white" />
-            <Text className="text-white/80 text-xs ml-1" numberOfLines={1}>
-              {item.email}
-            </Text>
+            {item.email ? (
+              <Text className="text-white/80 text-xs ml-1" numberOfLines={1}>
+                {item.email}
+              </Text>
+            ) : (
+              <Text className="text-white/60 text-xs ml-1">No email</Text>
+            )}
           </View>
           <View className="flex-row items-center">
             <Ionicons name="call" size={14} color="white" />
-            <Text className="text-white/80 text-xs ml-1">
-              {item.phone}
-            </Text>
+            {item.phone ? (
+              <Text className="text-white/80 text-xs ml-1">{item.phone}</Text>
+            ) : (
+              <Text className="text-white/60 text-xs ml-1">No phone</Text>
+            )}
           </View>
         </View>
       </View>
@@ -175,7 +190,7 @@ export default function MyCardsScreen() {
           </TouchableOpacity>
           
           <TouchableOpacity
-            onPress={() => handleDeleteCard(item.id, item.fullName)}
+            onPress={() => handleDeleteCard(item.id, item.title)}
             className="flex-row items-center bg-red-50 px-4 py-2 rounded-xl flex-1 ml-2"
           >
             <Ionicons name="trash" size={16} color="#EF4444" />
@@ -266,7 +281,7 @@ export default function MyCardsScreen() {
           </View>
           
           <TouchableOpacity
-            onPress={() => console.log('Create new card')}
+            onPress={() => router.push('/cards/make')}
             className="w-10 h-10 bg-blue-100 rounded-full items-center justify-center"
           >
             <Ionicons name="add" size={20} color="#3B82F6" />
@@ -284,7 +299,7 @@ export default function MyCardsScreen() {
             Create your first travel card to start connecting with fellow travelers around the world
           </Text>
           <TouchableOpacity
-            onPress={() => console.log('Navigate to create card')}
+            onPress={() => router.push('/cards/make')}
             className="bg-gradient-to-r from-blue-500 to-purple-600 px-8 py-4 rounded-2xl shadow-lg"
           >
             <View className="flex-row items-center">

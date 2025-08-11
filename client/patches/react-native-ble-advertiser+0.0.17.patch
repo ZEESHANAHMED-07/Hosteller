@@ -53,24 +53,3 @@ index 5246db1..02b3437 100644
 +    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
  </manifest>
 \ No newline at end of file
-
-diff --git a/node_modules/react-native-ble-advertiser/android/src/main/java/com/vitorpamplona/bleadvertiser/BLEAdvertiserModule.java b/node_modules/react-native-ble-advertiser/android/src/main/java/com/vitorpamplona/bleadvertiser/BLEAdvertiserModule.java
-index 3e1a3b7..9f2d1aa 100644
---- a/node_modules/react-native-ble-advertiser/android/src/main/java/com/vitorpamplona/bleadvertiser/BLEAdvertiserModule.java
-+++ b/node_modules/react-native-ble-advertiser/android/src/main/java/com/vitorpamplona/bleadvertiser/BLEAdvertiserModule.java
-@@
-     private AdvertiseData buildAdvertiseData(ParcelUuid uuid, byte[] payload, ReadableMap options) {
-         AdvertiseData.Builder dataBuilder = new AdvertiseData.Builder();
- 
-         if (options != null && options.hasKey("includeDeviceName")) 
-             dataBuilder.setIncludeDeviceName(options.getBoolean("includeDeviceName"));
-         
-          if (options != null && options.hasKey("includeTxPowerLevel")) 
-             dataBuilder.setIncludeTxPowerLevel(options.getBoolean("includeTxPowerLevel"));
-         
-         dataBuilder.addManufacturerData(companyId, payload);
--        dataBuilder.addServiceUuid(uuid);
-+        // Removed service UUID to keep advertisement under 31 bytes across devices
-+        // dataBuilder.addServiceUuid(uuid);
-         return dataBuilder.build();
-     }

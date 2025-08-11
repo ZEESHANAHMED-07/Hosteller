@@ -1,11 +1,10 @@
-import { SignedIn, SignedOut, useUser } from '@clerk/clerk-expo'
 import { Link, router } from 'expo-router'
 import { Text, View, TouchableOpacity, ScrollView } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import { SignOutButton } from '@/components/SignOutButton'
+import { useAuthContext } from '../providers/AuthProvider'
 
 export default function Page() {
-  const { user } = useUser()
+  const { user } = useAuthContext()
 
   const navigateToSettings = () => {
     router.push('/settings')
@@ -43,7 +42,7 @@ export default function Page() {
                   Welcome back!
                 </Text>
                 <Text className="text-gray-600 text-sm">
-                  {user?.emailAddresses[0].emailAddress}
+                  {user?.email || 'Signed in'}
                 </Text>
               </View>
             </View>

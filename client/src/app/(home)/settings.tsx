@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -6,10 +6,13 @@ import {
   TouchableOpacity,
   Switch,
   Alert,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '@clerk/clerk-expo';
-import { SignOutButton } from '@/components/SignOutButton';
+import { signOut, updateProfile } from 'firebase/auth';
+import { auth } from '../config/firebaseConfig';
+import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { db } from '../config/firebaseConfig';
 
 interface SettingItemProps {
   icon: keyof typeof Ionicons.glyphMap;
@@ -70,8 +73,10 @@ export default function SettingsScreen() {
   const [notifications, setNotifications] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
   const [locationServices, setLocationServices] = useState(true);
-
-  const { signOut } = useAuth()
+  const [profileEmail, setProfileEmail] = useState('');
+  const [profileUsername, setProfileUsername] = useState('');
+  const [loadingProfile, setLoadingProfile] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
 
   const handleLogout = () => {
     Alert.alert(
@@ -80,10 +85,57 @@ export default function SettingsScreen() {
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Logout', style: 'destructive',  onPress: async () => {
-            await signOut() 
+            try { await signOut(auth); } catch {}
           } },
       ]
     );
+  };
+
+  // Load profile (email, username) from Firestore, fallback to Auth
+  useEffect(() => {
+    const load = async () => {
+      const u = auth.currentUser;
+      if (!u) return;
+      setLoadingProfile(true);
+      try {
+        const ref = doc(db, 'users', u.uid);
+        const snap = await getDoc(ref);
+        const data = snap.exists() ? snap.data() as any : {};
+        setProfileEmail(String(data.email ?? u.email ?? ''));
+        setProfileUsername(String(data.username ?? u.displayName ?? ''));
+      } catch (e) {
+        console.warn('[Settings] load profile error', e);
+        setProfileEmail(String(auth.currentUser?.email ?? ''));
+        setProfileUsername(String(auth.currentUser?.displayName ?? ''));
+      } finally {
+        setLoadingProfile(false);
+      }
+    };
+    load();
+  }, []);
+
+  const saveProfile = async () => {
+    const u = auth.currentUser;
+    if (!u) return Alert.alert('Not signed in');
+    if (!profileEmail.trim()) return Alert.alert('Validation', 'Email cannot be empty');
+    if (!profileUsername.trim()) return Alert.alert('Validation', 'Username cannot be empty');
+    setSavingProfile(true);
+    try {
+      // Save to Firestore (we are not changing Auth email here to avoid re-auth flow)
+      await setDoc(doc(db, 'users', u.uid), {
+        email: profileEmail.trim(),
+        username: profileUsername.trim(),
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+      // Update display name in Auth
+      await updateProfile(u, { displayName: profileUsername.trim() });
+      Alert.alert('Saved', 'Profile updated');
+    } catch (e: any) {
+      console.error('[Settings] save profile error', e);
+      Alert.alert('Error', e?.message ? String(e.message) : 'Failed to save');
+    } finally {
+      setSavingProfile(false);
+    }
   };
 
   const handleDeleteAccount = () => {
@@ -105,6 +157,48 @@ export default function SettingsScreen() {
       </View>
 
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+        {/* Account Info - email and username */}
+        <SettingsSection title="Account Info">
+          <View className="px-4 py-4 gap-4">
+            <View>
+              <Text className="text-gray-700 font-medium mb-2">Email</Text>
+              <View className="bg-white rounded-xl border-2 border-gray-200 px-4 py-3">
+                <TextInput
+                  value={profileEmail}
+                  onChangeText={setProfileEmail}
+                  placeholder="you@example.com"
+                  placeholderTextColor="#9CA3AF"
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  className="text-gray-900 text-base"
+                />
+              </View>
+            </View>
+            <View>
+              <Text className="text-gray-700 font-medium mb-2">Username</Text>
+              <View className="bg-white rounded-xl border-2 border-gray-200 px-4 py-3">
+                <TextInput
+                  value={profileUsername}
+                  onChangeText={setProfileUsername}
+                  placeholder="Your name"
+                  placeholderTextColor="#9CA3AF"
+                  autoCapitalize="words"
+                  className="text-gray-900 text-base"
+                />
+              </View>
+            </View>
+            <TouchableOpacity
+              onPress={saveProfile}
+              disabled={savingProfile || loadingProfile}
+              className={`bg-blue-600 rounded-xl py-3 ${savingProfile || loadingProfile ? 'opacity-70' : ''}`}
+            >
+              <Text className="text-center text-white font-semibold">{savingProfile ? 'Saving...' : 'Save Changes'}</Text>
+            </TouchableOpacity>
+            {loadingProfile ? (
+              <Text className="text-gray-500 text-xs">Loading profile…</Text>
+            ) : null}
+          </View>
+        </SettingsSection>
         {/* Profile Section */}
         <SettingsSection title="Profile">
           <SettingItem

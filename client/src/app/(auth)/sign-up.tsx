@@ -1,142 +1,116 @@
-import * as React from 'react'
-import { SafeAreaView, Text, TextInput, TouchableOpacity, View } from 'react-native'
-import { Ionicons } from '@expo/vector-icons'
-import { useSignUp } from '@clerk/clerk-expo'
-import { Link, useRouter } from 'expo-router'
+import React, { useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { auth } from '../config/firebaseConfig';
+import { db } from '../config/firebaseConfig';
 
 export default function SignUpScreen() {
-  const { isLoaded, signUp, setActive } = useSignUp()
-  const router = useRouter()
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [username, setUsername] = useState(''); // optional display name
+  const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
-  const [emailAddress, setEmailAddress] = React.useState('')
-  const [password, setPassword] = React.useState('')
-  const [pendingVerification, setPendingVerification] = React.useState(false)
-  const [code, setCode] = React.useState('')
-  const [showPassword, setShowPassword] = React.useState(false)
+  const sanitizeUsername = (raw: string) => raw.trim();
 
-  // Handle submission of sign-up form
-  const onSignUpPress = async () => {
-    if (!isLoaded) return
-
-    // Start sign-up process using email and password provided
-    try {
-      await signUp.create({
-        emailAddress,
-        password,
-      })
-
-      // Send user an email with verification code
-      await signUp.prepareEmailAddressVerification({ strategy: 'email_code' })
-
-      // Set 'pendingVerification' to true to display second form
-      // and capture OTP code
-      setPendingVerification(true)
-    } catch (err) {
-      // See https://clerk.com/docs/custom-flows/error-handling
-      // for more info on error handling
-      console.error(JSON.stringify(err, null, 2))
+  const friendlyAuthError = (code?: string) => {
+    switch (code) {
+      case 'auth/email-already-in-use':
+        return 'Username is already taken. Try signing in instead.';
+      case 'auth/invalid-email':
+        return 'Invalid username format.';
+      case 'auth/weak-password':
+        return 'Passkey is too weak. Use at least 6 characters.';
+      case 'auth/network-request-failed':
+        return 'Network error. Please check your connection and try again.';
+      default:
+        return undefined;
     }
-  }
+  };
 
-  // Handle submission of verification form
-  const onVerifyPress = async () => {
-    if (!isLoaded) return
-
-    try {
-      // Use the code the user provided to attempt verification
-      const signUpAttempt = await signUp.attemptEmailAddressVerification({
-        code,
-      })
-
-      // If verification was completed, set the session to active
-      // and redirect the user
-      if (signUpAttempt.status === 'complete') {
-        await setActive({ session: signUpAttempt.createdSessionId })
-        router.replace('/')
-      } else {
-        // If the status is not complete, check why. User may need to
-        // complete further steps.
-        console.error(JSON.stringify(signUpAttempt, null, 2))
-      }
-    } catch (err) {
-      // See https://clerk.com/docs/custom-flows/error-handling
-      // for more info on error handling
-      console.error(JSON.stringify(err, null, 2))
+  const onSignup = async () => {
+    console.log('[AUTH][signup] click', { rawEmail: email, rawUsername: username, rawPassLen: password?.length ?? 0 });
+    const e = email.trim();
+    const p = password.trim();
+    const u = sanitizeUsername(username);
+    if (!e) return Alert.alert('Error', 'Enter a valid email');
+    if (p.length < 6) {
+      console.log('[AUTH][signup] validation failed: passkey too short');
+      return Alert.alert('Error', 'Passkey must be at least 6 characters');
     }
-  }
-
-  if (pendingVerification) {
-    return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-white dark:bg-black px-6">
-        <View className="w-full max-w-md">
-          <Text className="text-2xl font-bold text-center mb-6 text-black dark:text-white">
-            Verify your email
-          </Text>
-          <TextInput
-            className="w-full border border-gray-300 dark:border-gray-700 rounded-md px-4 py-3 mb-4 text-base text-black dark:text-white"
-            value={code}
-            placeholder="Verification code"
-            placeholderTextColor="#9CA3AF"
-            onChangeText={(val) => setCode(val)}
-            keyboardType="number-pad"
-          />
-          <TouchableOpacity
-            className="w-full bg-blue-600 rounded-md py-3 mb-2"
-            onPress={onVerifyPress}>
-            <Text className="text-white text-center font-semibold">Verify</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    )
-  }
+    setLoading(true);
+    try {
+      console.log('[AUTH][signup] creating user', { email: e });
+      const cred = await createUserWithEmailAndPassword(auth, e, p);
+      const user = cred.user;
+      console.log('[AUTH][signup] user created', { uid: user?.uid });
+      const displayName = u || e.split('@')[0];
+      await updateProfile(user, { displayName });
+      console.log('[AUTH][signup] profile updated');
+      await setDoc(doc(db, 'users', user.uid), {
+        email: e,
+        username: displayName,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+      console.log('[AUTH][signup] profile doc written');
+      Alert.alert('Success', 'Account created!', [{ text: 'Continue', onPress: () => router.replace('/') }]);
+    } catch (err: any) {
+      console.error('[AUTH][signup] error', { code: err?.code, message: err?.message, raw: err });
+      const msg = friendlyAuthError(err?.code) || (err?.message ? String(err.message) : 'Unknown error');
+      Alert.alert('Signup Error', msg);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <SafeAreaView className="flex-1 items-center justify-center bg-white dark:bg-black px-6">
-      <View className="w-full max-w-md">
-        <Text className="text-3xl font-bold text-center mb-6 text-black dark:text-white">
-          Create an account
-        </Text>
-        <TextInput
-          className="w-full border border-gray-300 dark:border-gray-700 rounded-md px-4 py-3 mb-4 text-base text-black dark:text-white"
-          autoCapitalize="none"
-          keyboardType="email-address"
-          value={emailAddress}
-          placeholder="Email address"
-          placeholderTextColor="#9CA3AF"
-          onChangeText={(val) => setEmailAddress(val)}
-        />
-        <View className="relative mb-6">
-          <TextInput
-            className="w-full border border-gray-300 dark:border-gray-700 rounded-md px-4 py-3 text-base text-black dark:text-white pr-12"
-            value={password}
-            placeholder="Password"
-            placeholderTextColor="#9CA3AF"
-            secureTextEntry={!showPassword}
-            onChangeText={(val) => setPassword(val)}
-          />
-          <TouchableOpacity 
-            className="absolute right-3 top-1/2 -translate-y-1/2"
-            onPress={() => setShowPassword(!showPassword)}
-          >
-            <Ionicons 
-              name={showPassword ? 'eye-off-outline' : 'eye-outline'} 
-              size={20} 
-              color="#9CA3AF" 
-            />
+    <KeyboardAvoidingView className="flex-1 bg-gray-50" behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <View className="bg-white pt-12 pb-6 px-4 border-b border-gray-100">
+        <View className="flex-row items-center">
+          <TouchableOpacity onPress={() => router.back()} className="w-10 h-10 bg-gray-100 rounded-full items-center justify-center mr-4">
+            <Ionicons name="arrow-back" size={20} color="#374151" />
           </TouchableOpacity>
-        </View>
-        <TouchableOpacity
-          className="w-full bg-blue-600 rounded-md py-3 mb-4"
-          onPress={onSignUpPress}>
-          <Text className="text-white text-center font-semibold">Continue</Text>
-        </TouchableOpacity>
-        <View className="flex-row justify-center space-x-1">
-          <Text className="text-black dark:text-white">Already have an account?</Text>
-          <Link href="/(auth)/sign-in">
-            <Text className="text-blue-600 font-semibold">Sign in</Text>
-          </Link>
+          <View>
+            <Text className="text-2xl font-bold text-gray-900">Sign Up</Text>
+            <Text className="text-gray-600 text-sm mt-1">Create your account with email and password</Text>
+          </View>
         </View>
       </View>
-    </SafeAreaView>
-  )
+
+      <View className="flex-1 px-4 py-8">
+        <View className="mb-4">
+          <Text className="text-gray-700 font-medium mb-2">Email</Text>
+          <View className="bg-white rounded-xl border-2 border-gray-200 px-4 py-3">
+            <TextInput value={email} onChangeText={setEmail} placeholder="you@example.com" placeholderTextColor="#9CA3AF" autoCapitalize="none" keyboardType="email-address" className="text-gray-900 text-base" />
+          </View>
+        </View>
+
+        <View className="mb-6">
+          <Text className="text-gray-700 font-medium mb-2">Password</Text>
+          <View className="bg-white rounded-xl border-2 border-gray-200 px-4 py-3 flex-row items-center">
+            <TextInput value={password} onChangeText={setPassword} placeholder="••••••••" placeholderTextColor="#9CA3AF" secureTextEntry={!showPassword} autoCapitalize="none" className="text-gray-900 text-base flex-1" />
+            <TouchableOpacity onPress={() => setShowPassword(s => !s)}>
+              <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color="#9CA3AF" />
+            </TouchableOpacity>
+          </View>
+          <Text className="text-gray-500 text-xs mt-2">Password must be at least 6 characters.</Text>
+        </View>
+
+        <View className="mb-6">
+          <Text className="text-gray-700 font-medium mb-2">Display name (optional)</Text>
+          <View className="bg-white rounded-xl border-2 border-gray-200 px-4 py-3">
+            <TextInput value={username} onChangeText={setUsername} placeholder="e.g. Soumo" placeholderTextColor="#9CA3AF" autoCapitalize="words" className="text-gray-900 text-base" />
+          </View>
+        </View>
+
+        <TouchableOpacity onPress={onSignup} disabled={loading} className={`bg-blue-600 rounded-xl py-4 ${loading ? 'opacity-70' : ''}`}>
+          <Text className="text-center text-white font-semibold text-lg">Create Account</Text>
+        </TouchableOpacity>
+      </View>
+    </KeyboardAvoidingView>
+  );
 }
