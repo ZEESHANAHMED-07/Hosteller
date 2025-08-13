@@ -4,6 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Link, router } from 'expo-router';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../config/firebaseConfig';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../config/firebaseConfig';
 
 export default function SignInScreen() {
   const [email, setEmail] = useState('');
@@ -32,8 +34,31 @@ export default function SignInScreen() {
     if (!e || !p) return Alert.alert('Error', 'Enter email and password');
     setLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, e, p);
-      Alert.alert('Welcome', `Logged in as ${e}`, [{ text: 'Continue', onPress: () => router.replace('/') }]);
+      const cred = await signInWithEmailAndPassword(auth, e, p);
+      if (!cred.user.emailVerified) {
+        router.replace('/(auth)/verify');
+        return;
+      }
+      // Ensure profile exists (created only after verification)
+      try {
+        const u = cred.user;
+        const userRef = doc(db, 'users', u.uid);
+        const snap = await getDoc(userRef);
+        if (!snap.exists()) {
+          await setDoc(userRef, {
+            email: u.email || e,
+            username: u.displayName || (e.split('@')[0]),
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          }, { merge: true });
+        } else {
+          // touch updatedAt
+          await setDoc(userRef, { updatedAt: serverTimestamp() }, { merge: true });
+        }
+      } catch (pf) {
+        console.warn('[AUTH][signin] ensure profile failed', pf);
+      }
+      router.replace('/');
     } catch (err: any) {
       const msg = friendlyAuthError(err?.code) || (err?.message ? String(err.message) : 'Unknown error');
       Alert.alert('Login Error', msg);

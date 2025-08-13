@@ -8,7 +8,9 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { BleManager, Device } from 'react-native-ble-plx';
+// Avoid importing native BLE module at top-level to prevent web/SSR crashes
+type BleManager = any;
+import { Platform } from 'react-native';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../config/firebaseConfig';
 import { getAuth } from 'firebase/auth';
@@ -30,7 +32,16 @@ interface Card {
 
 
 export default function BLESenderScreen() {
-  const [bleManager] = useState(() => new BleManager());
+  const [bleManager] = useState<BleManager | null>(() => {
+    if (Platform.OS === 'web') return null;
+    try {
+      const { BleManager: Manager } = require('react-native-ble-plx');
+      return new Manager();
+    } catch (e) {
+      console.warn('[BLE] module not available', e);
+      return null;
+    }
+  });
   const [cards, setCards] = useState<Card[]>([]);
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -47,7 +58,7 @@ export default function BLESenderScreen() {
     return () => {
       (async () => {
         try { await scanCtlRef.current?.stop(); } catch {}
-        try { bleManager.destroy(); } catch {}
+        try { bleManager?.destroy(); } catch {}
       })();
     };
   }, []);
@@ -62,6 +73,10 @@ export default function BLESenderScreen() {
 
   const initializeBLE = async () => {
     try {
+      if (!bleManager) {
+        console.warn('[BLE] Not supported on web');
+        return;
+      }
       const state = await bleManager.state();
       if (state !== 'PoweredOn') {
         Alert.alert('Bluetooth Error', BLE_ERRORS.BLUETOOTH_OFF);
@@ -105,6 +120,10 @@ export default function BLESenderScreen() {
 
   const toggleScan = async () => {
     try {
+      if (!bleManager) {
+        Alert.alert('Not supported', 'BLE scanning is not available on web.');
+        return;
+      }
       if (!isScanning) {
         console.log('[BLE][scan] starting scan...');
         setTransmissionStatus('Scanning for receivers nearby...');

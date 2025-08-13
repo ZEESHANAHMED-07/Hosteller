@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { createUserWithEmailAndPassword, updateProfile, sendEmailVerification, signOut } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth } from '../config/firebaseConfig';
 import { db } from '../config/firebaseConfig';
@@ -50,14 +50,16 @@ export default function SignUpScreen() {
       const displayName = u || e.split('@')[0];
       await updateProfile(user, { displayName });
       console.log('[AUTH][signup] profile updated');
-      await setDoc(doc(db, 'users', user.uid), {
-        email: e,
-        username: displayName,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      }, { merge: true });
-      console.log('[AUTH][signup] profile doc written');
-      Alert.alert('Success', 'Account created!', [{ text: 'Continue', onPress: () => router.replace('/') }]);
+      // Defer creating Firestore profile doc until after verification
+      try {
+        const authDomain = (auth.app.options as any)?.authDomain as string | undefined;
+        const url = authDomain ? `https://${authDomain}/__/auth/action` : undefined;
+        await sendEmailVerification(user, url ? { url, handleCodeInApp: false } : undefined as any);
+        console.log('[AUTH][signup] verification email sent');
+      } catch (ve) {
+        console.warn('[AUTH][signup] failed to send verification email', ve);
+      }
+      router.replace('/verify');
     } catch (err: any) {
       console.error('[AUTH][signup] error', { code: err?.code, message: err?.message, raw: err });
       const msg = friendlyAuthError(err?.code) || (err?.message ? String(err.message) : 'Unknown error');

@@ -1,8 +1,27 @@
-import { BleManager, Device, Characteristic } from 'react-native-ble-plx';
+// IMPORTANT: Do not import native BLE module at top-level to avoid SSR/web crashes.
+// We'll dynamically require it only on native at runtime.
+type BleManager = any;
+type Device = any;
+type Characteristic = any;
 import { Buffer } from 'buffer';
 import { BLE_CONFIG, BLEUtils } from './utils/bleUtils';
+import { Platform } from 'react-native';
 
-const bleManager = new BleManager();
+let bleManagerRef: BleManager | null = null;
+function getBleManager(): BleManager {
+  if (Platform.OS === 'web') {
+    throw new Error('BLE is not supported on web');
+  }
+  if (!bleManagerRef) {
+    const mod = require('react-native-ble-plx');
+    const Manager = mod?.BleManager;
+    if (!Manager) {
+      throw new Error('BLE module not available');
+    }
+    bleManagerRef = new Manager();
+  }
+  return bleManagerRef;
+}
 
 export interface BleConnection {
   device: Device;
@@ -17,10 +36,14 @@ export interface BleConnection {
  * Returns a BleConnection object on success.
  */
 export async function connectToDevice(serviceUuid = BLE_CONFIG.SERVICE_UUID): Promise<BleConnection> {
+  if (Platform.OS === 'web') {
+    throw new Error('BLE connect not supported on web');
+  }
+  const bleManager = getBleManager();
   return new Promise((resolve, reject) => {
     let found = false;
     // Start scanning for devices advertising our Service UUID
-    bleManager.startDeviceScan([serviceUuid], null, async (error, device) => {
+    bleManager.startDeviceScan([serviceUuid], null, async (error: any, device: any) => {
       if (error) {
         bleManager.stopDeviceScan();
         return reject(error);
@@ -46,7 +69,7 @@ export async function connectToDevice(serviceUuid = BLE_CONFIG.SERVICE_UUID): Pr
               );
             },
             onReceive: (handler) => {
-              char.monitor((err, c) => {
+              char.monitor((err: any, c: any) => {
                 if (err || !c?.value) return;
                 const raw = Buffer.from(c.value, 'base64');
                 handler(new Uint8Array(raw));

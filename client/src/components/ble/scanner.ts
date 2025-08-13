@@ -1,4 +1,6 @@
-import { BleManager, Device } from 'react-native-ble-plx';
+// Avoid importing native BLE module at top-level to prevent web/SSR crashes
+type BleManager = any;
+type Device = any;
 import { Buffer } from 'buffer';
 
 import { BLE_CONFIG, BLEUtils } from './utils/bleUtils';
@@ -110,7 +112,7 @@ export function startPeerScan(
         null,
         // Use low-latency to get results quicker and duplicates to keep RSSI fresh
         { allowDuplicates: true, scanMode: 2 /* ScanMode.LowLatency */ },
-        (error, device) => {
+        (error: any, device: any) => {
           if (error) {
             onError?.(error);
             return;
