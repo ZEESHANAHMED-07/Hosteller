@@ -53,7 +53,7 @@ export async function startBroadcasting(userId: string): Promise<void> {
           RNAdvertiser.ADVERTISE_MODE_LOW_LATENCY ?? RNAdvertiser.ADVERTISE_MODE_LOW_POWER,
         txPowerLevel:
           RNAdvertiser.ADVERTISE_TX_POWER_HIGH ?? RNAdvertiser.ADVERTISE_TX_POWER_MEDIUM,
-        connectable: false,
+        connectable: true,
         reportDelay: 0,
       } as const;
       console.log('[BLE][broadcast] starting broadcast with serviceUuid, options:', BLE_CONFIG.SERVICE_UUID, options);

@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, Alert, FlatList } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { startBroadcasting, stopBroadcasting, isAdvertising as getAdvertising } from '../../components/ble/broadcaster';
 import { router } from 'expo-router';
+import { startGattServer, stopGattServer, onWrite } from '../../components/ble/gattServer';
+import { BLEUtils } from '../../components/ble/utils/bleUtils';
 import { auth } from '../config/firebaseConfig';
 
 // Receiver screen only toggles broadcasting; no card or scanning logic here.
@@ -10,6 +12,8 @@ import { auth } from '../config/firebaseConfig';
 export default function BLEReceiverScreen() {
   const [scanStatus, setScanStatus] = useState<string>('');
   const [isBroadcasting, setIsBroadcasting] = useState<boolean>(false);
+  const [inbox, setInbox] = useState<Array<{ id: string; sender: string; docId: string; ts: number }>>([]);
+  const unsubscribeRef = React.useRef<null | (() => void)>(null);
 
   // Initialize current advertising state when screen mounts
   // (native advertiser may set this outside React's state)
@@ -30,10 +34,31 @@ export default function BLEReceiverScreen() {
         const source = (user.displayName || user.email || 'User').trim();
         const initial = source.charAt(0) || '?';
         await startBroadcasting(initial);
+        // Start GATT server and subscribe to writes
+        await startGattServer();
+        if (unsubscribeRef.current) { try { unsubscribeRef.current(); } catch {} }
+        unsubscribeRef.current = onWrite((packetString) => {
+          try {
+            console.log('[receiver] packetString received', packetString);
+            const parsed = BLEUtils.parsePacket(packetString);
+            if (!parsed) {
+              console.warn('[receiver] failed to parse incoming packet');
+              setScanStatus('Received malformed packet');
+              return;
+            }
+            const item = { id: `${parsed.docId}:${Date.now()}`, sender: parsed.sender, docId: parsed.docId, ts: Date.now() };
+            setInbox(prev => [item, ...prev].slice(0, 50));
+            setScanStatus(`Received from ${parsed.sender}: ${parsed.docId}`);
+          } catch (e) {
+            console.warn('[receiver] failed to parse packet', e);
+          }
+        });
         setIsBroadcasting(true);
         setScanStatus('Receiving On — You are visible to others nearby.');
       } else {
         await stopBroadcasting();
+        await stopGattServer();
+        if (unsubscribeRef.current) { try { unsubscribeRef.current(); } catch {} ; unsubscribeRef.current = null; }
         setIsBroadcasting(false);
         setScanStatus('Receiving Off');
       }
@@ -123,6 +148,27 @@ export default function BLEReceiverScreen() {
         <Text className="text-gray-600 text-sm">
           Turn on Receiving to broadcast yourself. Others nearby can find you and send their travel cards to you.
         </Text>
+      </View>
+
+      {/* Inbox of received requests */}
+      <View className="bg-white border-t border-gray-100">
+        <View className="px-4 py-3">
+          <Text className="text-gray-800 font-semibold">Incoming Requests</Text>
+        </View>
+        {inbox.length === 0 ? (
+          <View className="px-4 pb-4"><Text className="text-gray-500 text-sm">No requests yet.</Text></View>
+        ) : (
+          <FlatList
+            data={inbox}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <View className="px-4 py-3 border-t border-gray-50">
+                <Text className="text-gray-900 font-medium">{item.sender}</Text>
+                <Text className="text-gray-600 text-sm">Card: {item.docId}</Text>
+              </View>
+            )}
+          />
+        )}
       </View>
     </View>
   );

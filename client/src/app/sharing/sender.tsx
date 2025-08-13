@@ -13,7 +13,8 @@ import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../config/firebaseConfig';
 import { getAuth } from 'firebase/auth';
 import { BLE_ERRORS } from '../../components/ble/utils/bleUtils';
-import { startPeerScan, connectAndSendCard, ScannedPeer } from '../../components/ble/scanner';
+import { startPeerScan, ScannedPeer } from '../../components/ble/scanner';
+import { sendCardId } from '../../components/ble/connection';
 import { router } from 'expo-router';
 
 interface Card {
@@ -37,6 +38,7 @@ export default function BLESenderScreen() {
   const [peers, setPeers] = useState<ScannedPeer[]>([]);
   const [isScanning, setIsScanning] = useState<boolean>(false);
   const [selectedPeer, setSelectedPeer] = useState<ScannedPeer | null>(null);
+  const [isSending, setIsSending] = useState<boolean>(false);
   const scanCtlRef = React.useRef<{ stop: () => Promise<void> } | null>(null);
 
   useEffect(() => {
@@ -140,12 +142,18 @@ export default function BLESenderScreen() {
 
   const pickPeerAndSend = async (card: Card) => {
     if (!selectedPeer) return;
+    if (isSending) {
+      console.log('[sender] send in progress, ignoring tap');
+      return;
+    }
     try {
+      setIsSending(true);
       setTransmissionStatus('Sending card...');
       await scanCtlRef.current?.stop();
       setIsScanning(false);
       setSelectedCard(card);
-      await connectAndSendCard(selectedPeer, card.id, card.title);
+      console.log('[sender] sending cardId to device', selectedPeer.id, card.id);
+      await sendCardId(selectedPeer.device, card.id, card.title, { disconnectAfter: true });
       setTransmissionStatus('Card shared successfully!');
       Alert.alert('Success', `Travel card "${card.title}" has been shared!`);
       setSelectedPeer(null);
@@ -153,6 +161,8 @@ export default function BLESenderScreen() {
     } catch (e) {
       console.error('Send error', e);
       Alert.alert('Error', 'Failed to send card');
+    } finally {
+      setIsSending(false);
     }
   };
 
