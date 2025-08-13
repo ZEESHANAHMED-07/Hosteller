@@ -11,23 +11,27 @@ import { Ionicons } from '@expo/vector-icons';
 import { BleManager, Device } from 'react-native-ble-plx';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../config/firebaseConfig';
+import { getAuth } from 'firebase/auth';
 import { BLE_ERRORS } from '../../components/ble/utils/bleUtils';
 import { startPeerScan, connectAndSendCard, ScannedPeer } from '../../components/ble/scanner';
 import { router } from 'expo-router';
 
-interface TravelerCard {
+interface Card {
   id: string;
-  fullName: string;
+  type: string;
+  title: string;
   email: string;
   phone: string;
-  country: string;
-  bio: string;
+  socialLinks?: string[];
+  createdAt?: any;
+  updatedAt?: any;
 }
+
 
 export default function BLESenderScreen() {
   const [bleManager] = useState(() => new BleManager());
-  const [cards, setCards] = useState<TravelerCard[]>([]);
-  const [selectedCard, setSelectedCard] = useState<TravelerCard | null>(null);
+  const [cards, setCards] = useState<Card[]>([]);
+  const [selectedCard, setSelectedCard] = useState<Card | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [transmissionStatus, setTransmissionStatus] = useState<string>('');
   const [peers, setPeers] = useState<ScannedPeer[]>([]);
@@ -46,6 +50,14 @@ export default function BLESenderScreen() {
     };
   }, []);
 
+  // Refresh cards each time a peer is selected
+  useEffect(() => {
+    if (selectedPeer) {
+      setIsLoading(true);
+      fetchCards();
+    }
+  }, [selectedPeer]);
+
   const initializeBLE = async () => {
     try {
       const state = await bleManager.state();
@@ -61,13 +73,26 @@ export default function BLESenderScreen() {
 
   const fetchCards = async () => {
     try {
-      const q = query(collection(db, 'travelerCards'), orderBy('createdAt', 'desc'));
-      const querySnapshot = await getDocs(q);
-      const data: TravelerCard[] = querySnapshot.docs.map(doc => ({ 
-        id: doc.id, 
-        ...doc.data() 
-      })) as TravelerCard[];
-      setCards(data);
+      const user = getAuth().currentUser;
+      if (!user) throw new Error('User not signed in');
+      const qRef = query(
+        collection(db, 'users', user.uid, 'cards'),
+        orderBy('createdAt', 'desc')
+      );
+      const snapshot = await getDocs(qRef);
+      const rows: Card[] = snapshot.docs.map((d) => {
+        const data = d.data() as any;
+        return {
+          id: d.id,
+          title: data.title || '',
+          email: data.email || '',
+          phone: data.phone || '',
+          socialLinks: Array.isArray(data.socialLinks) ? data.socialLinks : [],
+          type: data.type || 'business',
+          createdAt: data.createdAt,
+        };
+      });
+      setCards(rows);
     } catch (error) {
       console.error('Error fetching cards:', error);
       Alert.alert('Error', 'Failed to fetch cards');
@@ -113,16 +138,16 @@ export default function BLESenderScreen() {
     }
   };
 
-  const pickPeerAndSend = async (card: TravelerCard) => {
+  const pickPeerAndSend = async (card: Card) => {
     if (!selectedPeer) return;
     try {
       setTransmissionStatus('Sending card...');
       await scanCtlRef.current?.stop();
       setIsScanning(false);
       setSelectedCard(card);
-      await connectAndSendCard(selectedPeer, card.id, card.fullName);
+      await connectAndSendCard(selectedPeer, card.id, card.title);
       setTransmissionStatus('Card shared successfully!');
-      Alert.alert('Success', `Travel card "${card.fullName}" has been shared!`);
+      Alert.alert('Success', `Travel card "${card.title}" has been shared!`);
       setSelectedPeer(null);
       setSelectedCard(null);
     } catch (e) {
@@ -131,11 +156,7 @@ export default function BLESenderScreen() {
     }
   };
 
-  // removed obsolete sendCardData (handled by connectAndSendCard)
-
-  // cleanup moved into effect return
-
-  const renderCard = ({ item }: { item: TravelerCard }) => (
+  const renderCard = ({ item }: { item: Card }) => (
     <TouchableOpacity
       onPress={() => pickPeerAndSend(item)}
       disabled={!selectedPeer}
@@ -148,8 +169,8 @@ export default function BLESenderScreen() {
           <Ionicons name="person" size={32} color="#3B82F6" />
         </View>
         <View className="flex-1">
-          <Text className="text-xl font-bold text-gray-900">{item.fullName}</Text>
-          <Text className="text-blue-600 text-sm">{item.country}</Text>
+          <Text className="text-xl font-bold text-gray-900">{item.title}</Text>
+          <Text className="text-blue-600 text-sm">{item.type}</Text>
         </View>
         {selectedCard?.id === item.id && (
           <View className="flex-row items-center">
@@ -160,7 +181,7 @@ export default function BLESenderScreen() {
       </View>
       
       <Text className="text-gray-700 mb-4" numberOfLines={2}>
-        {item.bio}
+        {item.socialLinks ? item.socialLinks.join(', ') : ''}
       </Text>
       
       <View className="flex-row justify-between">
@@ -273,31 +294,68 @@ export default function BLESenderScreen() {
 
       {/* Content: Either peers list or cards list */}
       {selectedPeer ? (
-        cards.length === 0 ? (
-          <View className="flex-1 items-center justify-center px-4">
-            <View className="w-24 h-24 bg-gray-100 rounded-3xl items-center justify-center mb-6">
-              <Ionicons name="albums-outline" size={48} color="#9CA3AF" />
+        <View className="flex-1 bg-gradient-to-br from-slate-50 to-blue-50">
+          {/* Header */}
+          <View className="bg-white pt-12 pb-6 px-4 border-b border-gray-100 shadow-sm">
+            <View className="flex-row items-center justify-between">
+              <View className="flex-row items-center">
+                <TouchableOpacity
+                  onPress={() => setSelectedPeer(null)}
+                  className="w-10 h-10 bg-gray-100 rounded-full items-center justify-center mr-4"
+                >
+                  <Ionicons name="arrow-back" size={20} color="#374151" />
+                </TouchableOpacity>
+                <View>
+                  <Text className="text-2xl font-bold text-gray-900">Send Card</Text>
+                  <Text className="text-gray-600 text-sm mt-1">
+                    {cards.length} card{cards.length !== 1 ? 's' : ''} available
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                onPress={() => router.push('/cards/createtypes')}
+                style={{
+                  backgroundColor: '#3B82F6',
+                  paddingHorizontal: 16,
+                  paddingVertical: 8,
+                  borderRadius: 12,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.1,
+                  shadowRadius: 4,
+                  elevation: 3,
+                }}
+              >
+                <Ionicons name="add" size={18} color="white" />
+                <Text style={{ color: 'white', fontWeight: '600', marginLeft: 6, fontSize: 14 }}>
+                  Create
+                </Text>
+              </TouchableOpacity>
             </View>
-            <Text className="text-gray-900 font-bold text-xl mb-2">No Cards Available</Text>
-            <Text className="text-gray-600 text-center mb-8">
-              Create some travel cards first to share them with other travelers
-            </Text>
-            <TouchableOpacity
-              onPress={() => router.push('/cards/createcards')}
-              className="bg-blue-500 px-8 py-4 rounded-2xl"
-            >
-              <Text className="text-white font-semibold text-lg">Create First Card</Text>
-            </TouchableOpacity>
           </View>
-        ) : (
-          <FlatList
-            data={cards}
-            renderItem={renderCard}
-            keyExtractor={item => item.id}
-            contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
-            showsVerticalScrollIndicator={false}
-          />
-        )
+
+          {cards.length === 0 ? (
+            <View className="flex-1 items-center justify-center px-4">
+              <View className="w-24 h-24 bg-gray-100 rounded-3xl items-center justify-center mb-6">
+                <Ionicons name="albums-outline" size={48} color="#9CA3AF" />
+              </View>
+              <Text className="text-gray-900 font-bold text-xl mb-2">No Cards Yet</Text>
+              <Text className="text-gray-600 text-center mb-8 leading-6">
+                Create your first card to start networking and connecting with people around the world
+              </Text>
+            </View>
+          ) : (
+            <FlatList
+              data={cards}
+              renderItem={renderCard}
+              keyExtractor={item => item.id}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+            />
+          )}
+        </View>
       ) : (
         <FlatList
           data={peers}
