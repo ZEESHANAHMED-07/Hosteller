@@ -59,7 +59,7 @@ export default function SignUpScreen() {
       } catch (ve) {
         console.warn('[AUTH][signup] failed to send verification email', ve);
       }
-      router.replace('/verify');
+      // Do not navigate here; (auth)/_layout will redirect unverified users to '/verify'
     } catch (err: any) {
       console.error('[AUTH][signup] error', { code: err?.code, message: err?.message, raw: err });
       const msg = friendlyAuthError(err?.code) || (err?.message ? String(err.message) : 'Unknown error');
