@@ -13,18 +13,18 @@ import { collection, getDocs, query, orderBy, deleteDoc, doc } from 'firebase/fi
 import { db, auth } from '../config/firebaseConfig';
 import { router } from 'expo-router';
 
-interface UserCard {
+interface Card {
   id: string;
-  type: 'personal' | 'work' | 'social' | string;
   title: string;
-  phone?: string;
-  email?: string;
-  socialLinks?: string[];
+  email: string;
+  phone: string;
+  socialLinks: string[];
+  type: 'business' | 'traveller' | 'social';
   createdAt?: any;
 }
 
 export default function MyCardsScreen() {
-  const [cards, setCards] = useState<UserCard[]>([]);
+  const [cards, setCards] = useState<Card[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,19 +32,31 @@ export default function MyCardsScreen() {
   const fetchCards = async () => {
     try {
       setError(null);
-      if (!auth.currentUser) {
+      const user = auth.currentUser;
+      if (!user) {
         setCards([]);
-        setLoading(false);
+        setError(null);
         return;
       }
-      const uid = auth.currentUser.uid;
-      const q = query(collection(db, 'users', uid, 'cards'), orderBy('createdAt', 'desc'));
-      const querySnapshot = await getDocs(q);
-      const data: UserCard[] = querySnapshot.docs.map(d => ({
-        id: d.id,
-        ...(d.data() as Omit<UserCard, 'id'>),
-      }));
-      setCards(data);
+
+      const qRef = query(
+        collection(db, 'users', user.uid, 'cards'),
+        orderBy('createdAt', 'desc')
+      );
+      const snapshot = await getDocs(qRef);
+      const rows: Card[] = snapshot.docs.map((d) => {
+        const data = d.data() as any;
+        return {
+          id: d.id,
+          title: data.title || '',
+          email: data.email || '',
+          phone: data.phone || '',
+          socialLinks: Array.isArray(data.socialLinks) ? data.socialLinks : [],
+          type: data.type || 'business',
+          createdAt: data.createdAt,
+        };
+      });
+      setCards(rows);
     } catch (err: any) {
       console.error('Error fetching cards:', err);
       setError('Failed to fetch cards. Please try again.');
@@ -63,10 +75,10 @@ export default function MyCardsScreen() {
     fetchCards();
   };
 
-  const handleDeleteCard = (cardId: string, cardName: string) => {
+  const handleDeleteCard = (card: Card) => {
     Alert.alert(
       'Delete Card',
-      `Are you sure you want to delete "${cardName}" card?`,
+      `Are you sure you want to delete "${card.title}" card?`,
       [
         { text: 'Cancel', style: 'cancel' },
         { 
@@ -74,9 +86,13 @@ export default function MyCardsScreen() {
           style: 'destructive', 
           onPress: async () => {
             try {
-              if (!auth.currentUser) return Alert.alert('Error', 'Not authenticated');
-              await deleteDoc(doc(db, 'users', auth.currentUser.uid, 'cards', cardId));
-              setCards(prev => prev.filter(card => card.id !== cardId));
+              const user = auth.currentUser;
+              if (!user) {
+                Alert.alert('Sign in required');
+                return;
+              }
+              await deleteDoc(doc(db, 'users', user.uid, 'cards', card.id));
+              setCards(prev => prev.filter(c => c.id !== card.id));
               Alert.alert('Success', 'Card deleted successfully');
             } catch (error) {
               Alert.alert('Error', 'Failed to delete card');
@@ -87,119 +103,154 @@ export default function MyCardsScreen() {
     );
   };
 
-  const handleEditCard = (cardId: string) => {
-    // Navigate to edit screen
-    console.log('Edit card:', cardId);
-    // router.push(`/edit-card/${cardId}`);
+  const handleEditCard = (card: Card) => {
+    // Navigate to create card screen with edit mode and card type
+    router.push(`/cards/createcards?type=${card.type}&edit=true&cardId=${card.id}`);
   };
 
-  const handleShareCard = (card: UserCard) => {
-    console.log('Share card:', card.title);
-    // Implement share functionality
+  const handleShareCard = (card: Card) => {
+    // Simple share functionality - you can implement actual sharing later
+    Alert.alert(
+      'Share Card',
+      `Share ${card.title}'s ${card.type} card`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Share', 
+          onPress: () => {
+            console.log('Sharing card:', card);
+            // Here you can implement actual sharing functionality
+            // like sharing via SMS, email, or social media
+          }
+        }
+      ]
+    );
+  };
+  
+  const getCardTypeInfo = (type: string) => {
+    switch (type) {
+      case 'business':
+        return { icon: 'briefcase-outline', color: 'blue', label: 'Business' };
+      case 'traveller':
+        return { icon: 'earth', color: 'green', label: 'Traveller' };
+      case 'social':
+        return { icon: 'chatbubble-ellipses-outline', color: 'purple', label: 'Social' };
+      default:
+        return { icon: 'card', color: 'gray', label: 'Card' };
+    }
   };
 
-  const getCardGradient = (index: number) => {
-    const gradients = [
-      'from-blue-500 to-purple-600',
-      'from-green-500 to-teal-600',
-      'from-orange-500 to-red-600',
-      'from-pink-500 to-rose-600',
-      'from-indigo-500 to-blue-600',
-      'from-purple-500 to-indigo-600',
-    ];
-    return gradients[index % gradients.length];
+  const getCardStyle = (type: string) => {
+    switch (type) {
+      case 'business':
+        return { backgroundColor: '#3B82F6' }; // blue-500
+      case 'traveller':
+        return { backgroundColor: '#10B981' }; // green-500
+      case 'social':
+        return { backgroundColor: '#8B5CF6' }; // purple-500
+      default:
+        return { backgroundColor: '#6B7280' }; // gray-500
+    }
   };
 
-  const renderItem = ({ item, index }: { item: UserCard; index: number }) => (
-    <View className="mb-6">
-      {/* Main Card */}
-      <View className={`bg-gradient-to-br ${getCardGradient(index)} rounded-3xl p-6 shadow-xl`}>
-        <View className="flex-row items-center justify-between mb-4">
-          <View className="flex-row items-center flex-1">
-            <View className="w-16 h-16 bg-white/20 rounded-2xl items-center justify-center mr-4">
-              <Ionicons name="person" size={32} color="white" />
+  const renderItem = ({ item, index }: { item: Card; index: number }) => {
+    const typeInfo = getCardTypeInfo(item.type);
+    
+    return (
+      <View className="mb-4">
+        {/* Enhanced Card Design */}
+        <View style={[getCardStyle(item.type), { borderRadius: 16, padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 8 }]}>
+          {/* Card Header */}
+          <View className="flex-row items-center justify-between mb-4">
+            <View className="flex-row items-center flex-1">
+              <View style={{ width: 56, height: 56, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                <Ionicons name={typeInfo.icon as any} size={24} color="white" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-white font-bold text-lg" numberOfLines={1}>{item.title}</Text>
+                <Text className="text-white/90 text-sm" numberOfLines={1}>{item.socialLinks?.[0] || ''}</Text>
+                <View className="flex-row items-center mt-1">
+                  <View style={{ backgroundColor: 'rgba(255,255,255,0.25)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12 }}>
+                    <Text className="text-white text-xs font-medium">{typeInfo.label}</Text>
+                  </View>
+                </View>
+              </View>
             </View>
-            <View className="flex-1">
-              <Text className="text-white font-bold text-xl">{item.title}</Text>
-              <Text className="text-white/80 text-sm capitalize">{item.type}</Text>
+          
+            {/* Quick Actions */}
+            <View className="flex-row">
+              <TouchableOpacity
+                onPress={() => handleShareCard(item)}
+                style={{ width: 32, height: 32, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginRight: 8 }}
+              >
+                <Ionicons name="share-outline" size={16} color="white" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => handleEditCard(item)}
+                style={{ width: 32, height: 32, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Ionicons name="pencil-outline" size={16} color="white" />
+              </TouchableOpacity>
             </View>
           </View>
           
-          {/* Card Actions */}
-          <View className="flex-row space-x-2">
-            <TouchableOpacity
-              onPress={() => handleShareCard(item)}
-              className="w-10 h-10 bg-white/20 rounded-full items-center justify-center"
-            >
-              <Ionicons name="share-outline" size={18} color="white" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => handleEditCard(item.id)}
-              className="w-10 h-10 bg-white/20 rounded-full items-center justify-center"
-            >
-              <Ionicons name="pencil-outline" size={18} color="white" />
-            </TouchableOpacity>
-          </View>
-        </View>
-        
-        {item.socialLinks && item.socialLinks.length > 0 ? (
-          <Text className="text-white/90 text-sm mb-4 leading-5" numberOfLines={2}>
-            {item.socialLinks.join(', ')}
-          </Text>
-        ) : null}
-        
-        <View className="flex-row justify-between items-center">
-          <View className="flex-row items-center">
-            <Ionicons name="mail" size={14} color="white" />
-            {item.email ? (
-              <Text className="text-white/80 text-xs ml-1" numberOfLines={1}>
+          {/* Social links preview */}
+          {item.socialLinks?.length ? (
+            <View className="mb-3">
+              <Text className="text-white/90 text-xs" numberOfLines={2}>
+                {item.socialLinks.slice(0, 2).join('  •  ')}
+              </Text>
+            </View>
+          ) : null}
+          
+          {/* Contact Info */}
+          <View className="flex-row justify-between items-center">
+            <View className="flex-row items-center flex-1 mr-2">
+              <Ionicons name="mail-outline" size={12} color="white" />
+              <Text className="text-white/80 text-xs ml-1 flex-1" numberOfLines={1}>
                 {item.email}
               </Text>
-            ) : (
-              <Text className="text-white/60 text-xs ml-1">No email</Text>
-            )}
-          </View>
-          <View className="flex-row items-center">
-            <Ionicons name="call" size={14} color="white" />
-            {item.phone ? (
-              <Text className="text-white/80 text-xs ml-1">{item.phone}</Text>
-            ) : (
-              <Text className="text-white/60 text-xs ml-1">No phone</Text>
-            )}
+            </View>
+            <View className="flex-row items-center">
+              <Ionicons name="call-outline" size={12} color="white" />
+              <Text className="text-white/80 text-xs ml-1">
+                {item.phone}
+              </Text>
+            </View>
           </View>
         </View>
-      </View>
 
-      {/* Action Bar */}
-      <View className="bg-white rounded-2xl mt-2 p-4 shadow-sm border border-gray-100">
-        <View className="flex-row justify-between items-center">
-          <TouchableOpacity
-            onPress={() => handleShareCard(item)}
-            className="flex-row items-center bg-blue-50 px-4 py-2 rounded-xl flex-1 mr-2"
-          >
-            <Ionicons name="share-social" size={16} color="#3B82F6" />
-            <Text className="text-blue-600 font-medium text-sm ml-2">Share</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            onPress={() => handleEditCard(item.id)}
-            className="flex-row items-center bg-green-50 px-4 py-2 rounded-xl flex-1 mx-1"
-          >
-            <Ionicons name="create" size={16} color="#059669" />
-            <Text className="text-green-600 font-medium text-sm ml-2">Edit</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            onPress={() => handleDeleteCard(item.id, item.title)}
-            className="flex-row items-center bg-red-50 px-4 py-2 rounded-xl flex-1 ml-2"
-          >
-            <Ionicons name="trash" size={16} color="#EF4444" />
-            <Text className="text-red-600 font-medium text-sm ml-2">Delete</Text>
-          </TouchableOpacity>
+        {/* Enhanced Action Bar */}
+        <View style={{ backgroundColor: 'rgba(255,255,255,0.95)', borderRadius: 12, marginTop: 12, padding: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}>
+          <View className="flex-row justify-between items-center">
+            <TouchableOpacity
+              onPress={() => handleShareCard(item)}
+              className={`flex-row items-center ${typeInfo.color === 'blue' ? 'bg-blue-50' : typeInfo.color === 'green' ? 'bg-green-50' : 'bg-purple-50'} px-3 py-2 rounded-lg flex-1 mr-1`}
+            >
+              <Ionicons name="share-social" size={14} color={typeInfo.color === 'blue' ? '#1D4ED8' : typeInfo.color === 'green' ? '#059669' : '#7C3AED'} />
+              <Text className={`${typeInfo.color === 'blue' ? 'text-blue-700' : typeInfo.color === 'green' ? 'text-green-700' : 'text-purple-700'} font-medium text-xs ml-1`}>Share</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              onPress={() => handleEditCard(item)}
+              className="flex-row items-center bg-gray-50 px-3 py-2 rounded-lg flex-1 mx-1"
+            >
+              <Ionicons name="create-outline" size={14} color="#6B7280" />
+              <Text className="text-gray-700 font-medium text-xs ml-1">Edit</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              onPress={() => handleDeleteCard(item)}
+              className="flex-row items-center bg-red-50 px-3 py-2 rounded-lg flex-1 ml-1"
+            >
+              <Ionicons name="trash-outline" size={14} color="#DC2626" />
+              <Text className="text-red-700 font-medium text-xs ml-1">Delete</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
     </View>
-  );
+    );
+  };
 
   if (loading) {
     return (
@@ -281,10 +332,25 @@ export default function MyCardsScreen() {
           </View>
           
           <TouchableOpacity
-            onPress={() => router.push('/cards/make')}
-            className="w-10 h-10 bg-blue-100 rounded-full items-center justify-center"
+            onPress={() => router.push('/cards/createtypes')}
+            style={{
+              backgroundColor: '#3B82F6',
+              paddingHorizontal: 16,
+              paddingVertical: 8,
+              borderRadius: 12,
+              flexDirection: 'row',
+              alignItems: 'center',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.1,
+              shadowRadius: 4,
+              elevation: 3,
+            }}
           >
-            <Ionicons name="add" size={20} color="#3B82F6" />
+            <Ionicons name="add" size={18} color="white" />
+            <Text style={{ color: 'white', fontWeight: '600', marginLeft: 6, fontSize: 14 }}>
+              Create
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -296,17 +362,9 @@ export default function MyCardsScreen() {
           </View>
           <Text className="text-gray-900 font-bold text-xl mb-2">No Cards Yet</Text>
           <Text className="text-gray-600 text-center mb-8 leading-6">
-            Create your first travel card to start connecting with fellow travelers around the world
+            Create your first card to start networking and connecting with people around the world
           </Text>
-          <TouchableOpacity
-            onPress={() => router.push('/cards/make')}
-            className="bg-gradient-to-r from-blue-500 to-purple-600 px-8 py-4 rounded-2xl shadow-lg"
-          >
-            <View className="flex-row items-center">
-              <Ionicons name="add-circle" size={20} color="white" />
-              <Text className="text-white font-semibold text-lg ml-2">Create First Card</Text>
-            </View>
-          </TouchableOpacity>
+
         </View>
       ) : (
         <FlatList

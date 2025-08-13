@@ -4,14 +4,11 @@ import {
   Text,
   TouchableOpacity,
   ScrollView,
-  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 
-const { width } = Dimensions.get('window');
-
-export default function CardManagementScreen() {
+export default function CreateTypesScreen() {
   const handleBusinessCard = () => {
     router.push('/cards/createcards?type=business');
   };
@@ -24,12 +21,8 @@ export default function CardManagementScreen() {
     router.push('/cards/createcards?type=social');
   };
 
-  const handleMyCards = () => {
-    router.push('/cards/mycards');
-  };
-
-  const handleHome = () => {
-    router.push('/');
+  const handleBack = () => {
+    router.back();
   };
 
   return (
@@ -38,39 +31,38 @@ export default function CardManagementScreen() {
       <View className="bg-white pt-12 pb-6 px-4 border-b border-gray-100 shadow-sm">
         <View className="flex-row items-center justify-between">
           <TouchableOpacity 
-            onPress={handleHome}
+            onPress={handleBack}
             className="w-10 h-10 bg-gray-100 rounded-full items-center justify-center"
           >
-            <Ionicons name="home" size={20} color="#374151" />
+            <Ionicons name="arrow-back" size={20} color="#374151" />
           </TouchableOpacity>
           <View className="flex-1 items-center">
-            <Text className="text-2xl font-bold text-gray-900">CARDS</Text>
-            <Text className="text-blue-600 font-semibold text-base mt-1">Manage your cards</Text>
+            <Text className="text-2xl font-bold text-gray-900">CREATE CARD</Text>
+            <Text className="text-blue-600 font-semibold text-base mt-1">Choose your card type</Text>
           </View>
           <View className="w-10 h-10" />
         </View>
       </View>
 
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-        {/* CARDS Section */}
+        {/* CARD TYPES Section */}
         <View className="px-6 py-6">
-
           <View className="mb-8">
             <View className="space-y-6">
-              {/* Create Card */}
+              {/* Business Card */}
               <TouchableOpacity
-                onPress={() => router.push('/cards/createtypes')}
+                onPress={handleBusinessCard}
                 className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 mb-4"
                 activeOpacity={0.8}
               >
                 <View className="flex-row items-center">
                   <View className="w-16 h-16 bg-blue-500 rounded-2xl items-center justify-center mr-4 shadow-md">
-                    <Ionicons name="add-circle-outline" size={28} color="white" />
+                    <Ionicons name="briefcase-outline" size={28} color="white" />
                   </View>
                   <View className="flex-1">
-                    <Text className="text-2xl font-bold text-gray-900 mb-1">CREATE CARD</Text>
+                    <Text className="text-2xl font-bold text-gray-900 mb-1">BUSINESS CARD</Text>
                     <Text className="text-gray-600 text-sm leading-5">
-                      Choose your card type and create new cards
+                      Professional networking for business travelers
                     </Text>
                   </View>
                   <Ionicons name="chevron-forward" size={24} color="#9CA3AF" />
@@ -78,29 +70,27 @@ export default function CardManagementScreen() {
                 
                 <View className="mt-4 pt-4 border-t border-gray-100">
                   <View className="flex-row items-center justify-between">
-                    <Text className="text-blue-700 text-sm font-medium">💼 Business</Text>
-                    <Text className="text-blue-700 text-sm font-medium">🌍 Travel</Text>
-                    <Text className="text-blue-700 text-sm font-medium">👥 Social</Text>
+                    <Text className="text-blue-700 text-sm font-medium">💼 Professional</Text>
+                    <Text className="text-blue-700 text-sm font-medium">🤝 Networking</Text>
+                    <Text className="text-blue-700 text-sm font-medium">📈 Business</Text>
                   </View>
                 </View>
               </TouchableOpacity>
 
-
-
-              {/* My Cards Button */}
+              {/* Traveller Card */}
               <TouchableOpacity
-                onPress={handleMyCards}
-                className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100"
+                onPress={handleTravellerCard}
+                className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 mb-4"
                 activeOpacity={0.8}
               >
                 <View className="flex-row items-center">
-                  <View className="w-16 h-16 bg-blue-400 rounded-2xl items-center justify-center mr-4 shadow-md">
-                    <Ionicons name="albums" size={32} color="#FFFFFF" />
+                  <View className="w-16 h-16 bg-green-500 rounded-2xl items-center justify-center mr-4 shadow-md">
+                    <Ionicons name="earth" size={28} color="white" />
                   </View>
                   <View className="flex-1">
-                    <Text className="text-2xl font-bold text-gray-900 mb-1">My Cards</Text>
+                    <Text className="text-2xl font-bold text-gray-900 mb-1">TRAVELLER CARD</Text>
                     <Text className="text-gray-600 text-sm leading-5">
-                      View, edit, and manage your existing travel cards
+                      Connect with fellow adventurers and explorers
                     </Text>
                   </View>
                   <Ionicons name="chevron-forward" size={24} color="#9CA3AF" />
@@ -108,18 +98,42 @@ export default function CardManagementScreen() {
                 
                 <View className="mt-4 pt-4 border-t border-gray-100">
                   <View className="flex-row items-center justify-between">
-                    <Text className="text-blue-700 text-sm font-medium">📝 Edit anytime</Text>
-                    <Text className="text-blue-700 text-sm font-medium">📊 View stats</Text>
-                    <Text className="text-blue-700 text-sm font-medium">🔄 Share easily</Text>
+                    <Text className="text-green-700 text-sm font-medium">🌍 Adventure</Text>
+                    <Text className="text-green-700 text-sm font-medium">🎒 Backpacking</Text>
+                    <Text className="text-green-700 text-sm font-medium">📍 Explore</Text>
                   </View>
                 </View>
               </TouchableOpacity>
 
-
+              {/* Social Card */}
+              <TouchableOpacity
+                onPress={handleSocialCard}
+                className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 mb-4"
+                activeOpacity={0.8}
+              >
+                <View className="flex-row items-center">
+                  <View className="w-16 h-16 bg-purple-500 rounded-2xl items-center justify-center mr-4 shadow-md">
+                    <Ionicons name="chatbubble-ellipses-outline" size={28} color="white" />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-2xl font-bold text-gray-900 mb-1">SOCIAL CARD</Text>
+                    <Text className="text-gray-600 text-sm leading-5">
+                      Make friends and build social connections
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={24} color="#9CA3AF" />
+                </View>
+                
+                <View className="mt-4 pt-4 border-t border-gray-100">
+                  <View className="flex-row items-center justify-between">
+                    <Text className="text-purple-700 text-sm font-medium">👥 Social</Text>
+                    <Text className="text-purple-700 text-sm font-medium">🎉 Fun</Text>
+                    <Text className="text-purple-700 text-sm font-medium">💬 Connect</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
             </View>
           </View>
-
-
 
           {/* Quick Tips */}
           <View className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 mb-6">
@@ -150,37 +164,6 @@ export default function CardManagementScreen() {
                   <Text className="text-purple-600 text-xs font-bold">3</Text>
                 </View>
                 <Text className="text-gray-700 text-sm flex-1">Use eye-catching designs to make memorable first impressions</Text>
-              </View>
-            </View>
-          </View>
-
-          {/* Feature Highlights */}
-          <View className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-2xl p-6 border border-indigo-100">
-            <Text className="text-indigo-900 font-bold text-lg mb-4 text-center">Why Use Travel Cards?</Text>
-            
-            <View className="flex-row flex-wrap justify-between">
-              <View className="items-center w-1/3 mb-4">
-                <View className="w-12 h-12 bg-indigo-100 rounded-xl items-center justify-center mb-2">
-                  <Ionicons name="flash" size={24} color="#4F46E5" />
-                </View>
-                <Text className="text-indigo-800 text-sm font-medium text-center">Instant</Text>
-                <Text className="text-indigo-600 text-xs text-center">Quick sharing</Text>
-              </View>
-              
-              <View className="items-center w-1/3 mb-4">
-                <View className="w-12 h-12 bg-indigo-100 rounded-xl items-center justify-center mb-2">
-                  <Ionicons name="shield-checkmark" size={24} color="#4F46E5" />
-                </View>
-                <Text className="text-indigo-800 text-sm font-medium text-center">Secure</Text>
-                <Text className="text-indigo-600 text-xs text-center">Safe contacts</Text>
-              </View>
-              
-              <View className="items-center w-1/3 mb-4">
-                <View className="w-12 h-12 bg-indigo-100 rounded-xl items-center justify-center mb-2">
-                  <Ionicons name="globe" size={24} color="#4F46E5" />
-                </View>
-                <Text className="text-indigo-800 text-sm font-medium text-center">Global</Text>
-                <Text className="text-indigo-600 text-xs text-center">Worldwide use</Text>
               </View>
             </View>
           </View>
