@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import { BLE_CONFIG, BLEUtils } from './utils/bleUtils';
+import { BLE_CONFIG, BLEUtils, AdvCodec, AdvOpcode } from './utils/bleUtils';
 import { ensureBlePermissions } from './utils/permissions';
 
 // Optional native advertiser (react-native-ble-advertiser) if installed
@@ -12,6 +12,7 @@ try {
 }
 
 let advertising = false;
+let currentMode: 'READY' | 'REQUEST' | 'ACCEPT' | null = null;
 
 export const isAdvertising = () => advertising;
 
@@ -30,7 +31,7 @@ export async function startBroadcasting(userId: string): Promise<void> {
       const granted = await ensureBlePermissions();
       console.log('[BLE][broadcast] permissions granted?', granted);
       if (!granted) throw new Error('Bluetooth permissions not granted');
-      // Manufacturer data: single byte = first letter (uppercase)
+      // Manufacturer data: single byte = first letter (uppercase) for READY mode (back-compat)
       const letter = firstLetter.toUpperCase();
       const manufacturerData: number[] = [ letter.charCodeAt(0) ];
       console.log('[BLE][broadcast] advertising letter:', letter, 'code:', manufacturerData[0]);
@@ -65,6 +66,7 @@ export async function startBroadcasting(userId: string): Promise<void> {
 
       // Optimistically set state; some devices resolve the promise late
       advertising = true;
+      currentMode = 'READY';
       console.log('[BLE][broadcast] broadcast invoked; advertising set true optimistically');
 
       if (maybePromise && typeof maybePromise.then === 'function') {
@@ -98,6 +100,88 @@ export async function stopBroadcasting(): Promise<void> {
   } finally {
     advertising = false;
     console.log('[BLE][broadcast] advertising set to false');
+    currentMode = null;
   }
+}
+
+// ---- TLV based one-shot broadcasts ----
+
+async function ensureReady(): Promise<void> {
+  const granted = await ensureBlePermissions();
+  if (!granted) throw new Error('Bluetooth permissions not granted');
+}
+
+function bytesToNumberArray(bytes: Uint8Array): number[] {
+  return Array.from(bytes);
+}
+
+async function startTlvBroadcast(frameBytes: Uint8Array, logLabel: string) {
+  if (Platform.OS !== 'android' || !RNAdvertiser) {
+    console.warn('[BLE][broadcast]', logLabel, 'fallback/no-op (android only with RNAdvertiser)');
+    advertising = true;
+    currentMode = null;
+    return;
+  }
+  await ensureReady();
+  const manufacturerId = 0xffff;
+  if (typeof RNAdvertiser.setCompanyId === 'function') {
+    RNAdvertiser.setCompanyId(manufacturerId);
+  }
+  const options = {
+    includeDeviceName: false,
+    includeTxPowerLevel: false,
+    advertiseMode: RNAdvertiser.ADVERTISE_MODE_LOW_LATENCY ?? RNAdvertiser.ADVERTISE_MODE_LOW_POWER,
+    txPowerLevel: RNAdvertiser.ADVERTISE_TX_POWER_HIGH ?? RNAdvertiser.ADVERTISE_TX_POWER_MEDIUM,
+    connectable: false,
+    reportDelay: 0,
+  } as const;
+  console.log('[BLE][broadcast]', logLabel, 'len', frameBytes.length, 'options', options);
+  const maybePromise = RNAdvertiser.broadcast(
+    BLE_CONFIG.SERVICE_UUID,
+    bytesToNumberArray(frameBytes),
+    options
+  );
+  advertising = true;
+  if (maybePromise && typeof maybePromise.then === 'function') {
+    (maybePromise as Promise<any>).then(() => {
+      console.log('[BLE][broadcast]', logLabel, 'native onStartSuccess');
+    }).catch((e: any) => console.warn('[BLE][broadcast]', logLabel, 'native onStartFailure', e));
+  }
+}
+
+export async function startRequestBroadcast(params: {
+  letter: string;
+  nonce: Uint8Array; // 4 bytes
+  cardIdShort: string;
+  autoStopMs?: number; // default 2000ms
+}) {
+  const { letter, nonce, cardIdShort, autoStopMs = 2000 } = params;
+  const frame = AdvCodec.encode({
+    opcode: AdvOpcode.REQUEST,
+    letterCode: AdvCodec.letterToCode(letter),
+    nonce,
+    cardIdShort,
+  });
+  await startTlvBroadcast(frame, 'REQUEST');
+  currentMode = 'REQUEST';
+  if (autoStopMs > 0) setTimeout(() => { stopBroadcasting().catch(()=>{}); }, autoStopMs);
+}
+
+export async function startAcceptBroadcast(params: {
+  letter: string;
+  nonce: Uint8Array; // echo sender's nonce
+  cardIdShort: string;
+  autoStopMs?: number; // default 2000ms
+}) {
+  const { letter, nonce, cardIdShort, autoStopMs = 2000 } = params;
+  const frame = AdvCodec.encode({
+    opcode: AdvOpcode.ACCEPT,
+    letterCode: AdvCodec.letterToCode(letter),
+    nonce,
+    cardIdShort,
+  });
+  await startTlvBroadcast(frame, 'ACCEPT');
+  currentMode = 'ACCEPT';
+  if (autoStopMs > 0) setTimeout(() => { stopBroadcasting().catch(()=>{}); }, autoStopMs);
 }
 

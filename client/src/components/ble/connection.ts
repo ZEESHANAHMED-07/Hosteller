@@ -55,7 +55,7 @@ export async function connectToDevice(serviceUuid = BLE_CONFIG.SERVICE_UUID): Pr
           const connectedDevice = await device.connect();
           await connectedDevice.discoverAllServicesAndCharacteristics();
           const chars = await connectedDevice.characteristicsForService(serviceUuid);
-          const char = chars.find(c => c.uuid.toLowerCase() === BLE_CONFIG.CHARACTERISTIC_UUID.toLowerCase());
+          const char = chars.find((c: any) => c.uuid.toLowerCase() === BLE_CONFIG.CHARACTERISTIC_UUID.toLowerCase());
           if (!char) throw new Error('Characteristic not found');
           resolve({
             device: connectedDevice,

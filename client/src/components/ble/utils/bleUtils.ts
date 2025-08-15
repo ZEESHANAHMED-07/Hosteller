@@ -135,3 +135,89 @@ export const BLE_ERRORS = {
   SCAN_TIMEOUT: 'Scan timeout. No devices found.',
   INVALID_DATA: 'Invalid data received.',
 };
+
+// ----- Advertising-only protocol (TLV over Manufacturer Data) -----
+export enum AdvOpcode {
+  REQUEST = 0x01,
+  ACCEPT = 0x02,
+  ACK = 0x03,
+}
+
+export type AdvFrame = {
+  version: number; // currently 1
+  opcode: AdvOpcode;
+  letterCode: number; // 0..25 maps to A..Z
+  nonce: Uint8Array; // 4 bytes
+  cardIdShort: string; // compact representation (<= 16 bytes recommended)
+};
+
+export const AdvConfig = {
+  version: 0x01,
+  // Max bytes for cardIdShort inside manufacturer payload to keep within adv length
+  maxCardIdBytes: 16,
+};
+
+export class AdvCodec {
+  static letterToCode(letter: string): number {
+    const c = (letter || 'A').trim().toUpperCase().charCodeAt(0);
+    if (isNaN(c)) return 0;
+    const code = c - 65;
+    return code >= 0 && code < 26 ? code : 0;
+  }
+
+  static codeToLetter(code: number): string {
+    const c = Math.max(0, Math.min(25, code | 0));
+    return String.fromCharCode(65 + c);
+  }
+
+  static randomNonce(): Uint8Array {
+    const arr = new Uint8Array(4);
+    for (let i = 0; i < 4; i++) arr[i] = Math.floor(Math.random() * 256);
+    return arr;
+  }
+
+  static toBytes(str: string): Uint8Array {
+    return Uint8Array.from(BLEUtils.stringToBytes(str));
+  }
+
+  static fromBytes(bytes: Uint8Array): string {
+    return BLEUtils.bytesToString(Array.from(bytes));
+  }
+
+  static bytesToBase64(bytes: Uint8Array): string {
+    return Buffer.from(bytes).toString('base64');
+  }
+
+  static base64ToBytes(b64: string): Uint8Array {
+    return new Uint8Array(Buffer.from(b64, 'base64'));
+  }
+
+  /**
+   * Encode a frame into Manufacturer Data bytes: [ver, opcode, letter, n0, n1, n2, n3, id...]
+   */
+  static encode(frame: Omit<AdvFrame, 'version'> & { version?: number }): Uint8Array {
+    const ver = (frame.version ?? AdvConfig.version) & 0xff;
+    const opcode = frame.opcode & 0xff;
+    const letter = frame.letterCode & 0xff;
+    const nonce = frame.nonce?.length === 4 ? frame.nonce : AdvCodec.randomNonce();
+    const idBytesFull = AdvCodec.toBytes(frame.cardIdShort || '');
+    const idBytes = idBytesFull.length > AdvConfig.maxCardIdBytes
+      ? idBytesFull.slice(0, AdvConfig.maxCardIdBytes)
+      : idBytesFull;
+    const out = new Uint8Array(7 + idBytes.length);
+    out[0] = ver; out[1] = opcode; out[2] = letter;
+    out.set(nonce, 3);
+    out.set(idBytes, 7);
+    return out;
+  }
+
+  static decode(bytes: Uint8Array): AdvFrame | null {
+    if (!bytes || bytes.length < 7) return null;
+    const version = bytes[0];
+    const opcode = bytes[1] as AdvOpcode;
+    const letterCode = bytes[2];
+    const nonce = bytes.slice(3, 7);
+    const cardIdShort = AdvCodec.fromBytes(bytes.slice(7));
+    return { version, opcode, letterCode, nonce, cardIdShort };
+  }
+}

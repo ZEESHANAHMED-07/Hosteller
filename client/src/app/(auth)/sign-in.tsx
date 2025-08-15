@@ -3,15 +3,27 @@ import { View, Text, TextInput, TouchableOpacity, Alert, KeyboardAvoidingView, P
 import { Ionicons } from '@expo/vector-icons';
 import { Link, router } from 'expo-router';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../config/firebaseConfig';
+import * as firebaseAuth from 'firebase/auth';
+import { auth, googleProvider } from '../config/firebaseConfig';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../config/firebaseConfig';
+import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
+
+WebBrowser.maybeCompleteAuthSession();
 
 export default function SignInScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  // Expo Auth Session config for native Google sign-in
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    // Paste your Web client ID (works in Expo Go); later add iOS/Android IDs for production
+    clientId: '',
+    scopes: ['profile', 'email'],
+  } as any);
 
   const friendlyAuthError = (code?: string) => {
     switch (code) {
@@ -25,6 +37,35 @@ export default function SignInScreen() {
         return 'Network error. Please check your connection and try again.';
       default:
         return undefined;
+    }
+  };
+
+  const onGoogle = async () => {
+    try {
+      setLoading(true);
+      if (Platform.OS === 'web') {
+        await (firebaseAuth as any).signInWithPopup(auth, googleProvider);
+        router.replace('/');
+        return;
+      }
+      if (!request) {
+        Alert.alert('Google Sign-In', 'Google auth is not configured. Please set clientId.');
+        return;
+      }
+      const res = await promptAsync();
+      if (res?.type === 'success') {
+        const idToken = res.authentication?.idToken;
+        if (!idToken) throw new Error('Missing Google idToken');
+        const cred = (firebaseAuth as any).GoogleAuthProvider.credential(idToken);
+        await (firebaseAuth as any).signInWithCredential(auth, cred);
+        router.replace('/');
+      } else if (res?.type === 'error') {
+        Alert.alert('Google Sign-In Error', res.error?.message || 'Failed to sign in');
+      }
+    } catch (e: any) {
+      Alert.alert('Google Sign-In Error', e?.message || 'Failed to sign in');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -102,6 +143,11 @@ export default function SignInScreen() {
 
         <TouchableOpacity onPress={onLogin} disabled={loading} className={`bg-blue-600 rounded-xl py-4 ${loading ? 'opacity-70' : ''}`}>
           <Text className="text-center text-white font-semibold text-lg">Login</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={onGoogle} disabled={loading} className={`mt-3 bg-white border-2 border-gray-200 rounded-xl py-4 flex-row items-center justify-center ${loading ? 'opacity-70' : ''}`}>
+          <Ionicons name="logo-google" size={18} color="#EA4335" />
+          <Text className="ml-2 text-gray-800 font-semibold text-base">Continue with Google</Text>
         </TouchableOpacity>
 
         <View className="mt-6 flex-row justify-center">

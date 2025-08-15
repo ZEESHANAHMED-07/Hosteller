@@ -3,7 +3,7 @@ type BleManager = any;
 type Device = any;
 import { Buffer } from 'buffer';
 
-import { BLE_CONFIG, BLEUtils } from './utils/bleUtils';
+import { BLE_CONFIG, BLEUtils, AdvCodec, AdvOpcode } from './utils/bleUtils';
 import { ensureBlePermissions } from './utils/permissions';
 
 export type ReadyAdvertPayload = {
@@ -24,6 +24,10 @@ export type ScannedPeer = {
 export type ScanCallbacks = {
   onUpdate?: (peers: ScannedPeer[]) => void;
   onError?: (e: unknown) => void;
+  // Optional advanced signals when TLV frames are decoded
+  onTlvFrame?: (frame: { opcode: AdvOpcode; letter: string; cardIdShort: string; nonceB64: string; deviceId: string; rssi: number; }) => void;
+  onRequest?: (args: { letter: string; cardIdShort: string; nonce: Uint8Array; device: Device; rssi: number; }) => void;
+  onAccept?: (args: { letter: string; cardIdShort: string; nonce: Uint8Array; device: Device; rssi: number; }) => void;
 };
 
 export type ScanOptions = {
@@ -42,13 +46,27 @@ function estimateDistanceFromRssi(rssi: number, measuredPower = -59): number {
   return Math.pow(10, ratio);
 }
 
-// Try to parse manufacturerData (base64) into our READY payload
-function parseReadyPayloadFromManufacturerData(base64?: string): ReadyAdvertPayload | undefined {
-  if (!base64) return undefined;
+// Try to parse manufacturerData (base64) into either TLV frame or legacy READY payload
+function parseFromManufacturerData(base64?: string): {
+  ready?: ReadyAdvertPayload;
+  tlv?: { opcode: AdvOpcode; letter: string; cardIdShort: string; nonce: Uint8Array };
+} {
+  const none = {} as any;
+  if (!base64) return none;
   try {
     const bytes = Buffer.from(base64, 'base64');
+    // First attempt TLV decode on raw bytes
+    let frame = AdvCodec.decode(Uint8Array.from(bytes));
+    // If that fails and we have room for company id, try skipping first 2 bytes
+    if (!frame && bytes.length >= 9) {
+      frame = AdvCodec.decode(Uint8Array.from(bytes.subarray(2))); // skip company id
+    }
+    if (frame) {
+      const letter = AdvCodec.codeToLetter(frame.letterCode);
+      return { tlv: { opcode: frame.opcode, letter, cardIdShort: frame.cardIdShort, nonce: frame.nonce } };
+    }
     // Many platforms include a 2-byte Company ID prefix in manufacturerData.
-    // Our advertiser sets companyId=0xFFFF and then app payload bytes.
+    // Our legacy format: single-letter indicates READY.
     const data = bytes.length >= 3 ? bytes.subarray(2) : bytes;
     
     // New format: single-letter (A-Z/a-z) indicates READY with that letter as name initial
@@ -58,30 +76,33 @@ function parseReadyPayloadFromManufacturerData(base64?: string): ReadyAdvertPayl
       if (isLetter) {
         const letter = String.fromCharCode(code).toUpperCase();
         console.log('[BLE][scan] parsed single-letter READY payload', letter);
-        return { t: 'READY', uid: letter, ts: Date.now() };
+        return { ready: { t: 'READY', uid: letter, ts: Date.now() } } as any;
       }
     }
     // Backward compatible format: 'R' + UTF-8(name)
     if (data.length >= 1 && String.fromCharCode(data[0]) === 'R') {
       if (data.length > 1) {
         const name = Buffer.from(data.subarray(1)).toString('utf8');
-        return { t: 'READY', uid: name, ts: Date.now() };
+        return { ready: { t: 'READY', uid: name, ts: Date.now() } } as any;
       }
-      return { t: 'READY', uid: '', ts: Date.now() };
+      return { ready: { t: 'READY', uid: '', ts: Date.now() } } as any;
     }
     // Compact marker support: single byte 'R' indicates READY
     if (data.length === 1 && String.fromCharCode(data[0]) === 'R') {
-      return { t: 'READY', uid: '', ts: Date.now() };
+      return { ready: { t: 'READY', uid: '', ts: Date.now() } } as any;
     }
-    const json = bytes.toString('utf8');
-    const parsed = JSON.parse(json);
-    if (parsed && parsed.t === 'READY' && typeof parsed.uid === 'string') {
-      return parsed as ReadyAdvertPayload;
-    }
+    // Legacy JSON fallback
+    try {
+      const json = bytes.toString('utf8');
+      const parsed = JSON.parse(json);
+      if (parsed && parsed.t === 'READY' && typeof parsed.uid === 'string') {
+        return { ready: parsed as ReadyAdvertPayload } as any;
+      }
+    } catch {}
   } catch {
     // ignore non-json manufacturer data
   }
-  return undefined;
+  return none;
 }
 
 export function startPeerScan(
@@ -90,7 +111,7 @@ export function startPeerScan(
   options: ScanOptions = {}
 ) {
   const peers: Record<string, ScannedPeer> = {};
-  const { onUpdate, onError } = callbacks;
+  const { onUpdate, onError, onTlvFrame, onRequest, onAccept } = callbacks;
   const { maxDistanceMeters, minRssi = -95, timeoutMs = BLE_CONFIG.SCAN_TIMEOUT } = options;
 
   let timeoutId: any;
@@ -133,7 +154,19 @@ export function startPeerScan(
             });
           }
 
-          let payload = parseReadyPayloadFromManufacturerData(mfg);
+          const parsed = parseFromManufacturerData(mfg);
+          let payload = parsed?.ready;
+          // Trigger TLV events if present
+          if (parsed?.tlv) {
+            const { opcode, letter, cardIdShort, nonce } = parsed.tlv;
+            const nonceB64 = AdvCodec.bytesToBase64(nonce);
+            onTlvFrame?.({ opcode, letter, cardIdShort, nonceB64, deviceId: device.id, rssi });
+            if (opcode === AdvOpcode.REQUEST) {
+              onRequest?.({ letter, cardIdShort, nonce, device, rssi });
+            } else if (opcode === AdvOpcode.ACCEPT) {
+              onAccept?.({ letter, cardIdShort, nonce, device, rssi });
+            }
+          }
           if (!payload) {
             // Fallback: if serviceUUIDs include our SERVICE_UUID, treat as READY
             const uuids: string[] | undefined = (device as any).serviceUUIDs;

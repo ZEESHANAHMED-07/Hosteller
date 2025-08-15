@@ -1,7 +1,7 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
-import { getAuth, initializeAuth, getReactNativePersistence } from "firebase/auth";
+import { getAuth, initializeAuth, getReactNativePersistence, GoogleAuthProvider } from "firebase/auth";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 // TODO: Add SDKs for Firebase products that you want to use
@@ -28,3 +28,7 @@ export const auth = Platform.OS === 'web'
   : initializeAuth(app, {
       persistence: getReactNativePersistence(AsyncStorage),
     });
+
+// Google provider for web popup sign-in
+export const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: 'select_account' });
