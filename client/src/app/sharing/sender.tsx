@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+
 import {
   View,
   Text,
@@ -8,6 +9,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+
 // Avoid importing native BLE module at top-level to prevent web/SSR crashes
 type BleManager = any;
 import { Platform } from 'react-native';
@@ -18,6 +20,7 @@ import { BLE_ERRORS } from '../../components/ble/utils/bleUtils';
 import { startPeerScan, ScannedPeer } from '../../components/ble/scanner';
 import { sendCardId } from '../../components/ble/connection';
 import { router } from 'expo-router';
+import { useTheme } from '../../contexts/ThemeContext';
 
 interface Card {
   id: string;
@@ -30,8 +33,8 @@ interface Card {
   updatedAt?: any;
 }
 
-
 export default function BLESenderScreen() {
+  const { colors } = useTheme();
   const [bleManager] = useState<BleManager | null>(() => {
     if (Platform.OS === 'web') return null;
     try {
@@ -189,40 +192,39 @@ export default function BLESenderScreen() {
     <TouchableOpacity
       onPress={() => pickPeerAndSend(item)}
       disabled={!selectedPeer}
-      className={`bg-white rounded-2xl p-6 mb-4 shadow-lg border ${
-        selectedCard?.id === item.id ? 'border-blue-500' : 'border-gray-100'
-      } ${!selectedPeer ? 'opacity-50' : ''}`}
+      className={`rounded-2xl p-6 mb-4 shadow-lg border ${!selectedPeer ? 'opacity-50' : ''}`}
+      style={{ backgroundColor: colors.card, borderColor: selectedCard?.id === item.id ? colors.primary : colors.border }}
     >
       <View className="flex-row items-center mb-4">
-        <View className="w-16 h-16 bg-blue-100 rounded-2xl items-center justify-center mr-4">
-          <Ionicons name="person" size={32} color="#3B82F6" />
+        <View className="w-16 h-16 rounded-2xl items-center justify-center mr-4" style={{ backgroundColor: colors.surface }}>
+          <Ionicons name="person" size={32} color={colors.primary} />
         </View>
         <View className="flex-1">
-          <Text className="text-xl font-bold text-gray-900">{item.title}</Text>
-          <Text className="text-blue-600 text-sm">{item.type}</Text>
+          <Text className="text-xl font-bold" style={{ color: colors.text }}>{item.title}</Text>
+          <Text className="text-sm" style={{ color: colors.primary }}>{item.type}</Text>
         </View>
         {selectedCard?.id === item.id && (
           <View className="flex-row items-center">
-            <Ionicons name="paper-plane" size={16} color="#3B82F6" />
-            <Text className="text-blue-600 text-sm ml-2">Ready to Send</Text>
+            <Ionicons name="paper-plane" size={16} color={colors.primary} />
+            <Text className="text-sm ml-2" style={{ color: colors.primary }}>Ready to Send</Text>
           </View>
         )}
       </View>
       
-      <Text className="text-gray-700 mb-4" numberOfLines={2}>
+      <Text className="mb-4" style={{ color: colors.textSecondary }} numberOfLines={2}>
         {item.socialLinks ? item.socialLinks.join(', ') : ''}
       </Text>
       
       <View className="flex-row justify-between">
-        <Text className="text-gray-500 text-sm">📧 {item.email}</Text>
-        <Text className="text-gray-500 text-sm">📱 {item.phone}</Text>
+        <Text className="text-sm" style={{ color: colors.textSecondary }}>📧 {item.email}</Text>
+        <Text className="text-sm" style={{ color: colors.textSecondary }}>📱 {item.phone}</Text>
       </View>
       
       {true && (
-        <View className="mt-4 pt-4 border-t border-gray-100">
+        <View className="mt-4 pt-4" style={{ borderTopWidth: 1, borderTopColor: colors.border }}>
           <View className="flex-row items-center justify-center">
-            <Ionicons name="send" size={16} color="#3B82F6" />
-            <Text className="text-blue-600 font-medium ml-2">Tap to Send to selected user</Text>
+            <Ionicons name="send" size={16} color={colors.primary} />
+            <Text className="font-medium ml-2" style={{ color: colors.primary }}>Tap to Send to selected user</Text>
           </View>
         </View>
       )}
@@ -232,22 +234,23 @@ export default function BLESenderScreen() {
   const renderPeer = ({ item }: { item: ScannedPeer }) => (
     <TouchableOpacity
       onPress={() => setSelectedPeer(item)}
-      className={`bg-white rounded-2xl p-4 mb-3 border ${selectedPeer?.id === item.id ? 'border-blue-500' : 'border-gray-100'}`}
+      className={`rounded-2xl p-4 mb-3 border`}
+      style={{ backgroundColor: colors.card, borderColor: selectedPeer?.id === item.id ? colors.primary : colors.border }}
     >
       <View className="flex-row items-center justify-between">
         <View className="flex-row items-center">
-          <View className="w-12 h-12 bg-blue-100 rounded-2xl items-center justify-center mr-3">
-            <Ionicons name="radio" size={20} color="#3B82F6" />
+          <View className="w-12 h-12 rounded-2xl items-center justify-center mr-3" style={{ backgroundColor: colors.surface }}>
+            <Ionicons name="radio" size={20} color={colors.primary} />
           </View>
           <View>
-            <Text className="text-gray-900 font-semibold">{
+            <Text className="font-semibold" style={{ color: colors.text }}>{
               (item.payload?.uid?.trim()?.charAt(0) || item.name?.trim()?.charAt(0) || 'U').toUpperCase()
             }</Text>
-            <Text className="text-gray-500 text-xs">RSSI {item.rssi} dBm {item.distanceMeters ? `· ~${item.distanceMeters.toFixed(1)}m` : ''}</Text>
+            <Text className="text-xs" style={{ color: colors.textSecondary }}>RSSI {item.rssi} dBm {item.distanceMeters ? `· ~${item.distanceMeters.toFixed(1)}m` : ''}</Text>
           </View>
         </View>
         {selectedPeer?.id === item.id && (
-          <Ionicons name="checkmark-circle" size={18} color="#3B82F6" />
+          <Ionicons name="checkmark-circle" size={18} color={colors.primary} />
         )}
       </View>
     </TouchableOpacity>
@@ -255,42 +258,50 @@ export default function BLESenderScreen() {
 
   if (isLoading) {
     return (
-      <View className="flex-1 bg-gradient-to-br from-slate-50 to-blue-50">
-        <View className="bg-white pt-12 pb-6 px-4 border-b border-gray-100">
+      <View className="flex-1" style={{ backgroundColor: colors.background }}>
+        <View
+          className="pt-12 pb-6 px-4"
+          style={{ backgroundColor: colors.header, borderBottomWidth: 1, borderBottomColor: colors.border }}
+        >
           <View className="flex-row items-center">
             <TouchableOpacity
               onPress={() => router.back()}
-              className="w-10 h-10 bg-gray-100 rounded-full items-center justify-center mr-4"
+              className="w-10 h-10 rounded-full items-center justify-center mr-4"
+              style={{ backgroundColor: colors.surface }}
             >
-              <Ionicons name="arrow-back" size={20} color="#374151" />
+              <Ionicons name="arrow-back" size={20} color={colors.text} />
             </TouchableOpacity>
-            <Text className="text-2xl font-bold text-gray-900">Share Cards</Text>
+            <Text className="text-2xl font-bold" style={{ color: colors.text }}>Share Cards</Text>
           </View>
         </View>
         
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color="#3B82F6" />
-          <Text className="text-gray-600 mt-4">Loading your cards...</Text>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text className="mt-4" style={{ color: colors.textSecondary }}>Loading your cards...</Text>
         </View>
       </View>
     );
   }
 
   return (
-    <View className="flex-1 bg-gradient-to-br from-slate-50 to-blue-50">
+    <View className="flex-1" style={{ backgroundColor: colors.background }}>
       {/* Header */}
-      <View className="bg-white pt-12 pb-6 px-4 border-b border-gray-100">
+      <View
+        className="pt-12 pb-6 px-4"
+        style={{ backgroundColor: colors.header, borderBottomWidth: 1, borderBottomColor: colors.border }}
+      >
         <View className="flex-row items-center justify-between">
           <View className="flex-row items-center">
             <TouchableOpacity
               onPress={() => router.back()}
-              className="w-10 h-10 bg-gray-100 rounded-full items-center justify-center mr-4"
+              className="w-10 h-10 rounded-full items-center justify-center mr-4"
+              style={{ backgroundColor: colors.surface }}
             >
-              <Ionicons name="arrow-back" size={20} color="#374151" />
+              <Ionicons name="arrow-back" size={20} color={colors.text} />
             </TouchableOpacity>
             <View>
-              <Text className="text-2xl font-bold text-gray-900">Share Cards</Text>
-              <Text className="text-gray-600 text-sm mt-1">Scan others nearby, then choose a card to send</Text>
+              <Text className="text-2xl font-bold" style={{ color: colors.text }}>Share Cards</Text>
+              <Text className="text-sm mt-1" style={{ color: colors.textSecondary }}>Scan others nearby, then choose a card to send</Text>
             </View>
           </View>
           <View />
@@ -299,44 +310,49 @@ export default function BLESenderScreen() {
         <View className="mt-3 items-center">
           <TouchableOpacity
             onPress={toggleScan}
-            className={`${isScanning ? 'bg-blue-600' : 'bg-gray-300'} px-6 py-3 rounded-full shadow`}
+            className={`px-6 py-3 rounded-full shadow`}
+            style={{ backgroundColor: isScanning ? colors.primary : colors.border }}
           >
             <Text className="text-white font-semibold">
               {isScanning ? 'Stop Scanning' : 'Scan Others Nearby'}
             </Text>
           </TouchableOpacity>
           {!!peers.length && (
-            <Text className="text-gray-600 mt-2">Found {peers.length} user{peers.length === 1 ? '' : 's'}</Text>
+            <Text className="mt-2" style={{ color: colors.textSecondary }}>Found {peers.length} user{peers.length === 1 ? '' : 's'}</Text>
           )}
         </View>
       </View>
 
       {/* Status Bar */}
       {transmissionStatus && (
-        <View className="bg-blue-50 px-4 py-3 border-b border-blue-100">
+        <View className="px-4 py-3" style={{ backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border }}>
           <View className="flex-row items-center">
-            <Ionicons name="radio" size={16} color="#3B82F6" />
-            <Text className="text-blue-700 font-medium ml-2">{transmissionStatus}</Text>
+            <Ionicons name="radio" size={16} color={colors.primary} />
+            <Text className="font-medium ml-2" style={{ color: colors.text }}>{transmissionStatus}</Text>
           </View>
         </View>
       )}
 
       {/* Content: Either peers list or cards list */}
       {selectedPeer ? (
-        <View className="flex-1 bg-gradient-to-br from-slate-50 to-blue-50">
+        <View className="flex-1" style={{ backgroundColor: colors.background }}>
           {/* Header */}
-          <View className="bg-white pt-12 pb-6 px-4 border-b border-gray-100 shadow-sm">
+          <View
+            className="pt-12 pb-6 px-4 shadow-sm"
+            style={{ backgroundColor: colors.header, borderBottomWidth: 1, borderBottomColor: colors.border }}
+          >
             <View className="flex-row items-center justify-between">
               <View className="flex-row items-center">
                 <TouchableOpacity
                   onPress={() => setSelectedPeer(null)}
-                  className="w-10 h-10 bg-gray-100 rounded-full items-center justify-center mr-4"
+                  className="w-10 h-10 rounded-full items-center justify-center mr-4"
+                  style={{ backgroundColor: colors.surface }}
                 >
-                  <Ionicons name="arrow-back" size={20} color="#374151" />
+                  <Ionicons name="arrow-back" size={20} color={colors.text} />
                 </TouchableOpacity>
                 <View>
-                  <Text className="text-2xl font-bold text-gray-900">Send Card</Text>
-                  <Text className="text-gray-600 text-sm mt-1">
+                  <Text className="text-2xl font-bold" style={{ color: colors.text }}>Send Card</Text>
+                  <Text className="text-sm mt-1" style={{ color: colors.textSecondary }}>
                     {cards.length} card{cards.length !== 1 ? 's' : ''} available
                   </Text>
                 </View>
@@ -344,7 +360,7 @@ export default function BLESenderScreen() {
               <TouchableOpacity
                 onPress={() => router.push('/cards/createtypes')}
                 style={{
-                  backgroundColor: '#3B82F6',
+                  backgroundColor: colors.primary,
                   paddingHorizontal: 16,
                   paddingVertical: 8,
                   borderRadius: 12,
@@ -357,8 +373,8 @@ export default function BLESenderScreen() {
                   elevation: 3,
                 }}
               >
-                <Ionicons name="add" size={18} color="white" />
-                <Text style={{ color: 'white', fontWeight: '600', marginLeft: 6, fontSize: 14 }}>
+                <Ionicons name="add" size={18} color="#FFFFFF" />
+                <Text style={{ color: '#FFFFFF', fontWeight: '600', marginLeft: 6, fontSize: 14 }}>
                   Create
                 </Text>
               </TouchableOpacity>
@@ -367,11 +383,11 @@ export default function BLESenderScreen() {
 
           {cards.length === 0 ? (
             <View className="flex-1 items-center justify-center px-4">
-              <View className="w-24 h-24 bg-gray-100 rounded-3xl items-center justify-center mb-6">
-                <Ionicons name="albums-outline" size={48} color="#9CA3AF" />
+              <View className="w-24 h-24 rounded-3xl items-center justify-center mb-6" style={{ backgroundColor: colors.surface }}>
+                <Ionicons name="albums-outline" size={48} color={colors.textSecondary} />
               </View>
-              <Text className="text-gray-900 font-bold text-xl mb-2">No Cards Yet</Text>
-              <Text className="text-gray-600 text-center mb-8 leading-6">
+              <Text className="font-bold text-xl mb-2" style={{ color: colors.text }}>No Cards Yet</Text>
+              <Text className="text-center mb-8 leading-6" style={{ color: colors.textSecondary }}>
                 Create your first card to start networking and connecting with people around the world
               </Text>
             </View>
@@ -393,19 +409,19 @@ export default function BLESenderScreen() {
           contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
           ListEmptyComponent={() => (
             <View className="flex-1 items-center justify-center px-4 mt-24">
-              <Text className="text-gray-600">Press "Scan Others Nearby" to discover receivers</Text>
+              <Text style={{ color: colors.textSecondary }}>Press "Scan Others Nearby" to discover receivers</Text>
             </View>
           )}
         />
       )}
 
       {/* Instructions */}
-      <View className="bg-white p-4 border-t border-gray-100">
+      <View className="p-4" style={{ backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border }}>
         <View className="flex-row items-center mb-2">
-          <Ionicons name="information-circle" size={16} color="#3B82F6" />
-          <Text className="text-blue-800 font-medium ml-2">How it works</Text>
+          <Ionicons name="information-circle" size={16} color={colors.primary} />
+          <Text className="font-medium ml-2" style={{ color: colors.text }}>How it works</Text>
         </View>
-        <Text className="text-gray-600 text-sm">
+        <Text className="text-sm" style={{ color: colors.textSecondary }}>
           1) Tap "Scan Others Nearby" and select a user. 2) Choose one of your cards to send it to them.
         </Text>
       </View>

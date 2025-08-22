@@ -1,31 +1,98 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   ScrollView,
-  Dimensions,
+  StyleSheet,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
+import { ComponentProps } from 'react';
+import { StatCardsSkeleton, CardTypesSkeleton, MyCardsSkeleton, TipsSkeleton } from '../../components/CardsSkeleton';
+import { useTheme } from '../../contexts/ThemeContext';
 
-const { width } = Dimensions.get('window');
+type IconName = ComponentProps<typeof Ionicons>['name'];
 
-export default function CardManagementScreen() {
-  const handleBusinessCard = () => {
-    router.push('/cards/createcards?type=business');
-  };
+interface CardType {
+  id: string;
+  title: string;
+  description: string;
+  icon: IconName;
+  color: string;
+  bgColor: string;
+  route: string;
+  features: string[];
+}
 
-  const handleTravellerCard = () => {
-    router.push('/cards/createcards?type=traveller');
-  };
+interface QuickStat {
+  label: string;
+  value: string;
+  icon: IconName;
+  color: string;
+}
 
-  const handleSocialCard = () => {
-    router.push('/cards/createcards?type=social');
-  };
+const cardTypes: CardType[] = [
+  {
+    id: 'business',
+    title: 'Business Card',
+    description: 'Professional networking for work connections',
+    icon: 'briefcase-outline',
+    color: '#3B82F6',
+    bgColor: '#DBEAFE',
+    route: '/cards/createcards?type=business',
+    features: ['Professional info', 'Company details', 'Contact methods']
+  },
+  {
+    id: 'traveller',
+    title: 'Traveller Card',
+    description: 'Connect with fellow travelers worldwide',
+    icon: 'airplane-outline',
+    color: '#10B981',
+    bgColor: '#D1FAE5',
+    route: '/cards/createcards?type=traveller',
+    features: ['Travel plans', 'Destinations', 'Social links']
+  },
+  {
+    id: 'social',
+    title: 'Social Card',
+    description: 'Personal connections and social networking',
+    icon: 'people-outline',
+    color: '#8B5CF6',
+    bgColor: '#EDE9FE',
+    route: '/cards/createcards?type=social',
+    features: ['Social media', 'Interests', 'Personal info']
+  }
+];
 
-  const handleMyCards = () => {
-    router.push('/cards/mycards');
+const quickStats: QuickStat[] = [
+  { label: 'Total Cards', value: '3', icon: 'card-outline', color: '#3B82F6' },
+  { label: 'Shared Today', value: '12', icon: 'share-outline', color: '#10B981' },
+  { label: 'Connections', value: '28', icon: 'link-outline', color: '#F59E0B' }
+];
+
+export default function CardsScreen() {
+  const { colors, isDarkMode } = useTheme();
+  const [refreshing, setRefreshing] = useState(false);
+  const [dataLoaded, setDataLoaded] = useState(false);
+
+  useEffect(() => {
+    // Simulate data loading
+    setTimeout(() => {
+      setDataLoaded(true);
+    }, 1000);
+  }, []);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    setDataLoaded(false);
+    
+    // Simulate refreshing data
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    setDataLoaded(true);
+    setRefreshing(false);
   };
 
   const handleHome = () => {
@@ -33,159 +100,464 @@ export default function CardManagementScreen() {
   };
 
   return (
-    <View className="flex-1 bg-gradient-to-br from-slate-50 to-blue-50">
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View className="bg-white pt-12 pb-6 px-4 border-b border-gray-100 shadow-sm">
-        <View className="flex-row items-center justify-between">
-          <TouchableOpacity 
-            onPress={handleHome}
-            className="w-10 h-10 bg-gray-100 rounded-full items-center justify-center"
-          >
-            <Ionicons name="home" size={20} color="#374151" />
+      <View style={[styles.header, { backgroundColor: colors.header, borderBottomColor: colors.border }]}> 
+        <View style={styles.headerRow}>
+          <TouchableOpacity onPress={handleHome} style={[styles.backButton, { backgroundColor: colors.surface }]} > 
+            <Ionicons name="arrow-back" size={wp('6%')} color={colors.text} />
           </TouchableOpacity>
-          <View className="flex-1 items-center">
-            <Text className="text-2xl font-bold text-gray-900">CARDS</Text>
-            <Text className="text-blue-600 font-semibold text-base mt-1">Manage your cards</Text>
+          <View style={styles.headerCenter}>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>My Cards</Text>
+            <Text style={[styles.headerSubtitle, { color: colors.primary }]}>Manage your travel cards</Text>
           </View>
-          <View className="w-10 h-10" />
+          <TouchableOpacity 
+            style={[styles.headerAction, { backgroundColor: colors.surface }]}
+            onPress={() => router.push('/cards/createtypes')}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="add" size={wp('6%')} color={colors.text} />
+          </TouchableOpacity>
         </View>
       </View>
 
-      <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-        {/* CARDS Section */}
-        <View className="px-6 py-6">
+      <ScrollView 
+        style={styles.scrollView} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[colors.primary]}
+            tintColor={colors.primary}
+          />
+        }
+      >
+        {/* Quick Stats */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Quick Stats</Text>
+          {!dataLoaded ? (
+            <StatCardsSkeleton />
+          ) : (
+            <View style={styles.statsRow}>
+              {quickStats.map((stat, index) => (
+                <View
+                  key={index}
+                  style={[
+                    styles.statCard,
+                    { backgroundColor: colors.card, borderColor: colors.border, elevation: isDarkMode ? 0 : 2, shadowOpacity: isDarkMode ? 0 : 0.05 },
+                  ]}
+                >
+                  <View style={[styles.statIcon, { backgroundColor: isDarkMode ? `${stat.color}22` : `${stat.color}20` }]}> 
+                    <Ionicons name={stat.icon} size={wp('5%')} color={stat.color} />
+                  </View>
+                  <Text style={[styles.statValue, { color: colors.text }]}>{stat.value}</Text>
+                  <Text style={[styles.statLabel, { color: colors.textSecondary }]}>{stat.label}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
 
-          <View className="mb-8">
-            <View className="space-y-6">
-              {/* Create Card */}
+        {/* Card Types */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Create New Card</Text>
+          {!dataLoaded ? (
+            <CardTypesSkeleton />
+          ) : (
+            cardTypes.map((cardType, index) => (
               <TouchableOpacity
-                onPress={() => router.push('/cards/createtypes')}
-                className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 mb-4"
-                activeOpacity={0.8}
+                key={cardType.id}
+                style={[
+                  styles.cardTypeItem,
+                  { backgroundColor: colors.card, borderColor: colors.border, elevation: isDarkMode ? 0 : 1, shadowOpacity: isDarkMode ? 0 : 0.03 },
+                ]}
+                onPress={() => router.push(cardType.route as any)}
+                activeOpacity={0.7}
               >
-                <View className="flex-row items-center">
-                  <View className="w-16 h-16 bg-blue-500 rounded-2xl items-center justify-center mr-4 shadow-md">
-                    <Ionicons name="add-circle-outline" size={28} color="white" />
-                  </View>
-                  <View className="flex-1">
-                    <Text className="text-2xl font-bold text-gray-900 mb-1">CREATE CARD</Text>
-                    <Text className="text-gray-600 text-sm leading-5">
-                      Choose your card type and create new cards
-                    </Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={24} color="#9CA3AF" />
+                <View style={[styles.cardTypeIcon, { backgroundColor: isDarkMode ? `${cardType.color}22` : cardType.bgColor }]}> 
+                  <Ionicons name={cardType.icon} size={wp('6%')} color={cardType.color} />
                 </View>
                 
-                <View className="mt-4 pt-4 border-t border-gray-100">
-                  <View className="flex-row items-center justify-between">
-                    <Text className="text-blue-700 text-sm font-medium">💼 Business</Text>
-                    <Text className="text-blue-700 text-sm font-medium">🌍 Travel</Text>
-                    <Text className="text-blue-700 text-sm font-medium">👥 Social</Text>
+                <View style={styles.cardTypeContent}>
+                  <Text style={[styles.cardTypeTitle, { color: colors.text }]}>{cardType.title}</Text>
+                  <Text style={[styles.cardTypeDescription, { color: colors.textSecondary }]}>{cardType.description}</Text>
+                  
+                  <View style={styles.cardTypeFeatures}>
+                    {cardType.features.map((feature, idx) => (
+                      <Text key={idx} style={[styles.featureText, { color: colors.textSecondary }]}>• {feature}</Text>
+                    ))}
                   </View>
-                </View>
-              </TouchableOpacity>
-
-
-
-              {/* My Cards Button */}
-              <TouchableOpacity
-                onPress={handleMyCards}
-                className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100"
-                activeOpacity={0.8}
-              >
-                <View className="flex-row items-center">
-                  <View className="w-16 h-16 bg-blue-400 rounded-2xl items-center justify-center mr-4 shadow-md">
-                    <Ionicons name="albums" size={32} color="#FFFFFF" />
-                  </View>
-                  <View className="flex-1">
-                    <Text className="text-2xl font-bold text-gray-900 mb-1">My Cards</Text>
-                    <Text className="text-gray-600 text-sm leading-5">
-                      View, edit, and manage your existing travel cards
-                    </Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={24} color="#9CA3AF" />
                 </View>
                 
-                <View className="mt-4 pt-4 border-t border-gray-100">
-                  <View className="flex-row items-center justify-between">
-                    <Text className="text-blue-700 text-sm font-medium">📝 Edit anytime</Text>
-                    <Text className="text-blue-700 text-sm font-medium">📊 View stats</Text>
-                    <Text className="text-blue-700 text-sm font-medium">🔄 Share easily</Text>
+                <Ionicons name="chevron-forward" size={wp('5%')} color={colors.textSecondary} />
+              </TouchableOpacity>
+            ))
+          )}
+        </View>
+
+        {/* My Cards Section */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>My Cards</Text>
+          {!dataLoaded ? (
+            <MyCardsSkeleton />
+          ) : (
+            <TouchableOpacity
+              style={[
+                styles.myCardsButton,
+                { backgroundColor: colors.surface, borderColor: colors.border, elevation: isDarkMode ? 0 : 2, shadowOpacity: isDarkMode ? 0 : 0.05 },
+              ]}
+              onPress={() => router.push('/cards/mycards')}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.myCardsIcon, { backgroundColor: colors.primary }]}>
+                <Ionicons name="albums" size={wp('6%')} color="#FFFFFF" />
+              </View>
+              
+              <View style={[styles.myCardsContent, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: wp('3%') }]}> 
+                <Text style={[styles.myCardsTitle, { color: colors.text }]}>View All Cards</Text>
+                <Text style={[styles.myCardsDescription, { color: colors.textSecondary }]}>Manage, edit and share your existing cards</Text>
+                
+                <View style={styles.myCardsStats}>
+                  <View style={styles.myCardsStat}>
+                    <Text style={[styles.myCardsStatValue, { color: colors.primary }]}>3</Text>
+                    <Text style={[styles.myCardsStatLabel, { color: colors.textSecondary }]}>Active</Text>
+                  </View>
+                  <View style={styles.myCardsStat}>
+                    <Text style={[styles.myCardsStatValue, { color: colors.primary }]}>12</Text>
+                    <Text style={[styles.myCardsStatLabel, { color: colors.textSecondary }]}>Shared</Text>
+                  </View>
+                  <View style={styles.myCardsStat}>
+                    <Text style={[styles.myCardsStatValue, { color: colors.primary }]}>28</Text>
+                    <Text style={[styles.myCardsStatLabel, { color: colors.textSecondary }]}>Views</Text>
                   </View>
                 </View>
-              </TouchableOpacity>
-
-
-            </View>
-          </View>
-
-
-
-          {/* Quick Tips */}
-          <View className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 mb-6">
-            <View className="flex-row items-center mb-4">
-              <View className="w-10 h-10 bg-yellow-100 rounded-full items-center justify-center mr-3">
-                <Ionicons name="star" size={20} color="#F59E0B" />
-              </View>
-              <Text className="text-gray-900 font-bold text-lg">Pro Tips</Text>
-            </View>
-            
-            <View className="space-y-3">
-              <View className="flex-row items-start">
-                <View className="w-6 h-6 bg-blue-100 rounded-full items-center justify-center mr-3 mt-0.5">
-                  <Text className="text-blue-600 text-xs font-bold">1</Text>
-                </View>
-                <Text className="text-gray-700 text-sm flex-1">Create different cards for different travel styles (adventure, luxury, budget)</Text>
               </View>
               
-              <View className="flex-row items-start">
-                <View className="w-6 h-6 bg-green-100 rounded-full items-center justify-center mr-3 mt-0.5">
-                  <Text className="text-green-600 text-xs font-bold">2</Text>
-                </View>
-                <Text className="text-gray-700 text-sm flex-1">Keep your cards updated with current location and travel plans</Text>
-              </View>
-              
-              <View className="flex-row items-start">
-                <View className="w-6 h-6 bg-purple-100 rounded-full items-center justify-center mr-3 mt-0.5">
-                  <Text className="text-purple-600 text-xs font-bold">3</Text>
-                </View>
-                <Text className="text-gray-700 text-sm flex-1">Use eye-catching designs to make memorable first impressions</Text>
-              </View>
-            </View>
-          </View>
+              <Ionicons name="chevron-forward" size={wp('5%')} color={colors.textSecondary} />
+            </TouchableOpacity>
+          )}
+        </View>
 
-          {/* Feature Highlights */}
-          <View className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-2xl p-6 border border-indigo-100">
-            <Text className="text-indigo-900 font-bold text-lg mb-4 text-center">Why Use Travel Cards?</Text>
-            
-            <View className="flex-row flex-wrap justify-between">
-              <View className="items-center w-1/3 mb-4">
-                <View className="w-12 h-12 bg-indigo-100 rounded-xl items-center justify-center mb-2">
-                  <Ionicons name="flash" size={24} color="#4F46E5" />
+        {/* Pro Tips */}
+        <View style={styles.section}>
+          {!dataLoaded ? (
+            <TipsSkeleton />
+          ) : (
+            <View style={[styles.tipsCard, { backgroundColor: colors.card, borderColor: colors.border, elevation: isDarkMode ? 0 : 2, shadowOpacity: isDarkMode ? 0 : 0.05 }]}> 
+              <View style={styles.tipsHeader}>
+                <View style={[styles.tipsIcon, { backgroundColor: isDarkMode ? '#F59E0B22' : '#FEF3C7' }]}> 
+                  <Ionicons name="bulb" size={wp('5%')} color="#F59E0B" />
                 </View>
-                <Text className="text-indigo-800 text-sm font-medium text-center">Instant</Text>
-                <Text className="text-indigo-600 text-xs text-center">Quick sharing</Text>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Pro Tips</Text>
               </View>
               
-              <View className="items-center w-1/3 mb-4">
-                <View className="w-12 h-12 bg-indigo-100 rounded-xl items-center justify-center mb-2">
-                  <Ionicons name="shield-checkmark" size={24} color="#4F46E5" />
+              <View style={styles.tipsList}>
+                <View style={styles.tipItem}>
+                  <View style={[styles.tipNumber, { backgroundColor: isDarkMode ? '#3B82F622' : '#DBEAFE' }]}> 
+                    <Text style={styles.tipNumberText}>1</Text>
+                  </View>
+                  <Text style={[styles.tipText, { color: colors.textSecondary }]}>Create different cards for different occasions and audiences</Text>
                 </View>
-                <Text className="text-indigo-800 text-sm font-medium text-center">Secure</Text>
-                <Text className="text-indigo-600 text-xs text-center">Safe contacts</Text>
-              </View>
-              
-              <View className="items-center w-1/3 mb-4">
-                <View className="w-12 h-12 bg-indigo-100 rounded-xl items-center justify-center mb-2">
-                  <Ionicons name="globe" size={24} color="#4F46E5" />
+                
+                <View style={styles.tipItem}>
+                  <View style={[styles.tipNumber, { backgroundColor: isDarkMode ? '#3B82F622' : '#DBEAFE' }]}> 
+                    <Text style={styles.tipNumberText}>2</Text>
+                  </View>
+                  <Text style={[styles.tipText, { color: colors.textSecondary }]}>Keep your information updated and relevant to your current travels</Text>
                 </View>
-                <Text className="text-indigo-800 text-sm font-medium text-center">Global</Text>
-                <Text className="text-indigo-600 text-xs text-center">Worldwide use</Text>
+                
+                <View style={styles.tipItem}>
+                  <View style={[styles.tipNumber, { backgroundColor: isDarkMode ? '#3B82F622' : '#DBEAFE' }]}> 
+                    <Text style={styles.tipNumberText}>3</Text>
+                  </View>
+                  <Text style={[styles.tipText, { color: colors.textSecondary }]}>Use engaging visuals and clear descriptions to make connections</Text>
+                </View>
               </View>
             </View>
-          </View>
+          )}
         </View>
       </ScrollView>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  header: {
+    backgroundColor: '#FFFFFF',
+    paddingTop: hp('6%'),
+    paddingBottom: hp('2%'),
+    paddingHorizontal: wp('4%'),
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  backButton: {
+    width: wp('10%'),
+    height: wp('10%'),
+    borderRadius: wp('5%'),
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerCenter: {
+    flex: 1,
+    alignItems: 'center',
+    marginHorizontal: wp('4%'),
+  },
+  headerTitle: {
+    fontSize: wp('6%'),
+    fontWeight: '700',
+    color: '#1E293B',
+    letterSpacing: 0.5,
+  },
+  headerSubtitle: {
+    fontSize: wp('3.5%'),
+    color: '#3B82F6',
+    fontWeight: '600',
+    marginTop: hp('0.5%'),
+  },
+  headerAction: {
+    width: wp('10%'),
+    height: wp('10%'),
+    borderRadius: wp('5%'),
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  section: {
+    paddingHorizontal: wp('4%'),
+    paddingVertical: hp('2%'),
+  },
+  sectionTitle: {
+    fontSize: wp('4.5%'),
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: hp('2%'),
+    letterSpacing: 0.3,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: hp('1%'),
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: wp('4%'),
+    padding: wp('4%'),
+    alignItems: 'center',
+    marginHorizontal: wp('1%'),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  statIcon: {
+    width: wp('10%'),
+    height: wp('10%'),
+    borderRadius: wp('5%'),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: hp('1%'),
+  },
+  statValue: {
+    fontSize: wp('5%'),
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: hp('0.5%'),
+  },
+  statLabel: {
+    fontSize: wp('3%'),
+    color: '#64748B',
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  cardTypeItem: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: wp('4%'),
+    padding: wp('4%'),
+    marginBottom: hp('2%'),
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  cardTypeIcon: {
+    width: wp('12%'),
+    height: wp('12%'),
+    borderRadius: wp('6%'),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: wp('4%'),
+  },
+  cardTypeContent: {
+    flex: 1,
+  },
+  cardTypeTitle: {
+    fontSize: wp('4.5%'),
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: hp('0.5%'),
+  },
+  cardTypeDescription: {
+    fontSize: wp('3.5%'),
+    color: '#64748B',
+    marginBottom: hp('1%'),
+    lineHeight: wp('5%'),
+  },
+  cardTypeFeatures: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  featureTag: {
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: wp('2%'),
+    paddingVertical: hp('0.5%'),
+    borderRadius: wp('2%'),
+    marginRight: wp('2%'),
+    marginBottom: hp('0.5%'),
+  },
+  featureText: {
+    fontSize: wp('3%'),
+    fontWeight: '500',
+  },
+  myCardsButton: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: wp('4%'),
+    padding: wp('4%'),
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  myCardsIcon: {
+    width: wp('12%'),
+    height: wp('12%'),
+    borderRadius: wp('6%'),
+    backgroundColor: '#3B82F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: wp('4%'),
+  },
+  myCardsContent: {
+    flex: 1,
+  },
+  myCardsTitle: {
+    fontSize: wp('4.5%'),
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: hp('0.5%'),
+  },
+  myCardsDescription: {
+    fontSize: wp('3.5%'),
+    color: '#64748B',
+    marginBottom: hp('1%'),
+    lineHeight: wp('5%'),
+  },
+  myCardsStats: {
+    flexDirection: 'row',
+  },
+  myCardsStat: {
+    alignItems: 'center',
+    marginRight: wp('6%'),
+  },
+  myCardsStatValue: {
+    fontSize: wp('4%'),
+    fontWeight: '700',
+    color: '#3B82F6',
+  },
+  myCardsStatLabel: {
+    fontSize: wp('3%'),
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  tipsCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: wp('4%'),
+    padding: wp('4%'),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  tipsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: hp('2%'),
+  },
+  tipsIcon: {
+    width: wp('8%'),
+    height: wp('8%'),
+    borderRadius: wp('4%'),
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: wp('3%'),
+  },
+  tipsTitle: {
+    fontSize: wp('4.5%'),
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  tipsList: {
+    gap: hp('1.5%'),
+  },
+  tipItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  tipNumber: {
+    width: wp('6%'),
+    height: wp('6%'),
+    borderRadius: wp('3%'),
+    backgroundColor: '#DBEAFE',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: wp('3%'),
+    marginTop: hp('0.2%'),
+  },
+  tipNumberText: {
+    fontSize: wp('3%'),
+    fontWeight: '700',
+    color: '#3B82F6',
+  },
+  tipText: {
+    flex: 1,
+    fontSize: wp('3.5%'),
+    color: '#64748B',
+    lineHeight: wp('5%'),
+  },
+});

@@ -6,10 +6,12 @@ import { router } from 'expo-router';
 import { startGattServer, stopGattServer, onWrite } from '../../components/ble/gattServer';
 import { BLEUtils } from '../../components/ble/utils/bleUtils';
 import { auth } from '../config/firebaseConfig';
+import { useTheme } from '../../contexts/ThemeContext';
 
 // Receiver screen only toggles broadcasting; no card or scanning logic here.
 
 export default function BLEReceiverScreen() {
+  const { colors } = useTheme();
   const [scanStatus, setScanStatus] = useState<string>('');
   const [isBroadcasting, setIsBroadcasting] = useState<boolean>(false);
   const [inbox, setInbox] = useState<Array<{ id: string; sender: string; docId: string; ts: number }>>([]);
@@ -67,104 +69,95 @@ export default function BLEReceiverScreen() {
     }
   };
 
-  // Scanning logic intentionally removed; will be handled on a separate screen/flow
-
-  // stopScanning removed
-
-  // Receiving connections removed from this screen
-
-  // showReceivedCard removed
-
-  // cleanup removed
-
-  // renderScannedDevice removed
-
   return (
-    <View className="flex-1 bg-gradient-to-br from-slate-50 to-green-50">
+    <View className="flex-1" style={{ backgroundColor: colors.background }}>
       {/* Header */}
-      <View className="bg-white pt-12 pb-6 px-4 border-b border-gray-100">
+      <View
+        className="pt-12 pb-6 px-4"
+        style={{ backgroundColor: colors.header, borderBottomWidth: 1, borderBottomColor: colors.border }}
+      >
         <View className="flex-row items-center justify-between">
           <View className="flex-row items-center">
             <TouchableOpacity
               onPress={() => router.back()}
-              className="w-10 h-10 bg-gray-100 rounded-full items-center justify-center mr-4"
+              className="w-10 h-10 rounded-full items-center justify-center mr-4"
+              style={{ backgroundColor: colors.surface }}
             >
-              <Ionicons name="arrow-back" size={20} color="#374151" />
+              <Ionicons name="arrow-back" size={20} color={colors.text} />
             </TouchableOpacity>
-          <View>
-            <Text className="text-2xl font-bold text-gray-900">Receive Cards</Text>
-            <Text className="text-gray-600 text-sm mt-1">Let others find you and send cards</Text>
+            <View>
+              <Text className="text-2xl font-bold" style={{ color: colors.text }}>Receive Cards</Text>
+              <Text className="text-sm mt-1" style={{ color: colors.textSecondary }}>Let others find you and send cards</Text>
+            </View>
           </View>
+          <View />
         </View>
-        <View />
       </View>
       {/* Centered Receiving toggle */}
       <View className="mt-3 items-center">
         <TouchableOpacity
           onPress={onToggleBroadcast}
-          className={`${isBroadcasting ? 'bg-blue-600' : 'bg-gray-300'} px-6 py-3 rounded-full shadow`}
+          className={`px-6 py-3 rounded-full shadow`}
+          style={{ backgroundColor: isBroadcasting ? colors.primary : colors.border }}
         >
           <Text className="text-white font-semibold">
             {isBroadcasting ? 'Receiving On' : 'Receiving Off'}
           </Text>
         </TouchableOpacity>
       </View>
-    </View>
-
-    {/* Status Bar */}
-    {scanStatus !== '' && (
-      <View className="bg-blue-50 px-4 py-3 border-b border-blue-100">
-        <View className="flex-row items-center justify-center">
-          <Ionicons name={isBroadcasting ? 'radio' : 'pause-circle'} size={16} color={isBroadcasting ? '#2563EB' : '#6B7280'} />
-          <Text className={`font-medium ml-2 ${isBroadcasting ? 'text-blue-700' : 'text-gray-600'}`}>{scanStatus}</Text>
+      {/* Status Bar */}
+      {scanStatus !== '' && (
+        <View className="px-4 py-3" style={{ backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+          <View className="flex-row items-center justify-center">
+            <Ionicons name={isBroadcasting ? 'radio' : 'pause-circle'} size={16} color={isBroadcasting ? colors.primary : colors.textSecondary} />
+            <Text className={`font-medium ml-2`} style={{ color: isBroadcasting ? colors.text : colors.textSecondary }}>{scanStatus}</Text>
+          </View>
         </View>
-      </View>
-    )}
+      )}
 
-    {/* Main Content */}
-    <View className="flex-1 px-4 py-6 items-center justify-center">
-      <View className={`w-full rounded-2xl p-6 ${isBroadcasting ? 'bg-blue-600' : 'bg-gray-200'}`}>
-        <View className="items-center">
-          <Ionicons name={isBroadcasting ? 'radio' : 'pause'} size={48} color="#FFFFFF" />
-          <Text className="text-white font-bold text-xl mt-3">
-            {isBroadcasting ? 'Receiving On' : 'Receiving Off'}
-          </Text>
-          <Text className="text-white/90 mt-2 text-center">
-            {isBroadcasting
-              ? 'You are visible to others. Keep this screen open to receive cards.'
-              : 'You are not visible to others. Toggle Receiving to start.'}
-          </Text>
+      {/* Main Content */}
+      <View className="flex-1 px-4 py-6 items-center justify-center" style={{ backgroundColor: colors.background }}>
+        <View className={`w-full rounded-2xl p-6`} style={{ backgroundColor: isBroadcasting ? colors.primary : colors.surface }}>
+          <View className="items-center">
+            <Ionicons name={isBroadcasting ? 'radio' : 'pause'} size={48} color="#FFFFFF" />
+            <Text className="text-white font-bold text-xl mt-3">
+              {isBroadcasting ? 'Receiving On' : 'Receiving Off'}
+            </Text>
+            <Text className="mt-2 text-center" style={{ color: '#FFFFFFCC' }}>
+              {isBroadcasting
+                ? 'You are visible to others. Keep this screen open to receive cards.'
+                : 'You are not visible to others. Toggle Receiving to start.'}
+            </Text>
+          </View>
         </View>
-      </View>
-
       </View>
 
       {/* Instructions */}
-      <View className="bg-white p-4 border-t border-gray-100">
+      <View className="p-4" style={{ backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border }}>
         <View className="flex-row items-center mb-2">
-          <Ionicons name="information-circle" size={16} color="#059669" />
-          <Text className="text-green-800 font-medium ml-2">How to receive</Text>
+          <Ionicons name="information-circle" size={16} color={colors.primary} />
+          <Text className="font-medium ml-2" style={{ color: colors.text }}>How to receive</Text>
         </View>
-        <Text className="text-gray-600 text-sm">
+        <Text className="text-sm" style={{ color: colors.textSecondary }}>
           Turn on Receiving to broadcast yourself. Others nearby can find you and send their travel cards to you.
         </Text>
       </View>
 
       {/* Inbox of received requests */}
-      <View className="bg-white border-t border-gray-100">
+      <View style={{ backgroundColor: colors.card, borderTopWidth: 1, borderTopColor: colors.border }}>
         <View className="px-4 py-3">
-          <Text className="text-gray-800 font-semibold">Incoming Requests</Text>
+          <Text className="font-semibold" style={{ color: colors.text }}>Incoming Requests</Text>
         </View>
         {inbox.length === 0 ? (
-          <View className="px-4 pb-4"><Text className="text-gray-500 text-sm">No requests yet.</Text></View>
+          <View className="px-4 pb-4"><Text className="text-sm" style={{ color: colors.textSecondary }}>No requests yet.</Text></View>
         ) : (
           <FlatList
             data={inbox}
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
-              <View className="px-4 py-3 border-t border-gray-50">
-                <Text className="text-gray-900 font-medium">{item.sender}</Text>
-                <Text className="text-gray-600 text-sm">Card: {item.docId}</Text>
+              <View className="px-4 py-3" style={{ borderTopWidth: 1, borderTopColor: colors.border }}>
+                <Text className="font-medium" style={{ color: colors.text }}>{item.sender}</Text>
+                <Text className="text-sm" style={{ color: colors.textSecondary }}>Card: {item.docId}</Text>
               </View>
             )}
           />

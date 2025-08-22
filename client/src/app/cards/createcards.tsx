@@ -8,11 +8,15 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  StyleSheet,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { collection, addDoc, serverTimestamp, doc, getDoc, updateDoc } from 'firebase/firestore';
-import { db, auth } from '../config/firebaseConfig'
+import { db, auth } from '../config/firebaseConfig';
+import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
+import { useTheme } from '../../contexts/ThemeContext';
 
 interface CardData {
   fullName: string;
@@ -42,11 +46,10 @@ interface CardConfig {
 }
 
 export default function CreateCardScreen() {
+  const { colors, isDarkMode } = useTheme();
   const { type, edit, cardId } = useLocalSearchParams<{ type: CardType; edit?: string; cardId?: string }>();
   const isEditMode = edit === 'true' && cardId;
   const cardType: CardType = (type as CardType) || 'business';
-  
-  console.log('Edit Mode Debug:', { type, edit, cardId, isEditMode });
   
   const [formData, setFormData] = useState<CardData>({
     fullName: '',
@@ -67,7 +70,7 @@ export default function CreateCardScreen() {
       title: 'Create Your Business Card',
       subtitle: 'Professional networking made easy',
       icon: 'briefcase-outline',
-      color: 'blue-500',
+      color: '#3B82F6',
       field1Label: 'Company',
       field1Placeholder: 'Your Company Name',
       field2Label: 'Position',
@@ -88,7 +91,7 @@ export default function CreateCardScreen() {
       title: 'Create Your Traveller Card',
       subtitle: 'Connect with fellow adventurers',
       icon: 'earth',
-      color: 'green-500',
+      color: '#10B981',
       field1Label: 'Current Destination',
       field1Placeholder: 'Where are you traveling?',
       field2Label: 'Travel Style',
@@ -109,7 +112,7 @@ export default function CreateCardScreen() {
       title: 'Create Your Social Card',
       subtitle: 'Make friends and build connections',
       icon: 'chatbubble-ellipses-outline',
-      color: 'purple-500',
+      color: '#8B5CF6',
       field1Label: 'Interests',
       field1Placeholder: 'Your hobbies and interests',
       field2Label: 'Social Platform',
@@ -167,12 +170,10 @@ export default function CreateCardScreen() {
 
   useEffect(() => {
     if (type && cardConfigs[type]) {
-      // Valid card type, load existing data if in edit mode
       if (edit === 'true' && cardId) {
         loadCardData();
       }
     } else {
-      // Invalid type, redirect back
       router.back();
     }
   }, [type, edit, cardId]);
@@ -188,13 +189,11 @@ export default function CreateCardScreen() {
         router.replace('/sign-in');
         return;
       }
-      // Read from users/{uid}/cards/{cardId}
+      
       const cardDoc = await getDoc(doc(db, 'users', user.uid, 'cards', String(cardId)));
       
       if (cardDoc.exists()) {
         const cardData = cardDoc.data();
-        // Map unified schema -> form fields
-        // title -> fullName, socialLinks[0..1] -> field1/field2
         const links: string[] = Array.isArray(cardData.socialLinks) ? cardData.socialLinks : [];
         setFormData({
           fullName: cardData.title || '',
@@ -230,7 +229,6 @@ export default function CreateCardScreen() {
         return;
       }
 
-      // Map form -> unified schema
       const socialLinks = [formData.field1.trim(), formData.field2.trim()].filter(Boolean);
       const payload = {
         type: (String(type) as 'business' | 'traveller' | 'social'),
@@ -241,7 +239,6 @@ export default function CreateCardScreen() {
       } as const;
 
       if (edit === 'true' && cardId) {
-        // Update users/{uid}/cards/{cardId}
         await updateDoc(doc(db, 'users', user.uid, 'cards', String(cardId)), {
           ...payload,
           updatedAt: serverTimestamp(),
@@ -250,15 +247,9 @@ export default function CreateCardScreen() {
         Alert.alert(
           'Success!',
           `Your ${cardType} card has been updated successfully!`,
-          [
-            {
-              text: 'OK',
-              onPress: () => router.back(),
-            },
-          ]
+          [{ text: 'OK', onPress: () => router.back() }]
         );
       } else {
-        // Create users/{uid}/cards/{cardId}
         const docRef = await addDoc(collection(db, 'users', user.uid, 'cards'), {
           ...payload,
           createdAt: serverTimestamp(),
@@ -270,12 +261,7 @@ export default function CreateCardScreen() {
         Alert.alert(
           'Success!',
           `Your ${cardType} card has been created successfully!`,
-          [
-            {
-              text: 'OK',
-              onPress: () => router.back(),
-            },
-          ]
+          [{ text: 'OK', onPress: () => router.back() }]
         );
       }
     } catch (error) {
@@ -292,82 +278,83 @@ export default function CreateCardScreen() {
 
   const updateField = (field: keyof CardData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    // Clear error when user starts typing
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: undefined }));
     }
   };
 
+  if (isLoadingCard) {
+    return (
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading card data...</Text>
+      </View>
+    );
+  }
+
   return (
     <KeyboardAvoidingView 
-      className="flex-1 bg-gray-50" 
+      style={[styles.container, { backgroundColor: colors.background }]} 
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       {/* Header */}
-      <View className="bg-white pt-12 pb-6 px-4 border-b border-gray-100">
-        <View className="flex-row items-center">
+      <View style={[styles.header, { backgroundColor: colors.header, borderBottomColor: colors.border }]}>
+        <View style={styles.headerRow}>
           <TouchableOpacity
             onPress={() => router.back()}
-            className="w-10 h-10 bg-gray-100 rounded-full items-center justify-center mr-4"
+            style={[styles.backButton, { backgroundColor: colors.surface }]}
           >
-            <Ionicons name="arrow-back" size={20} color="#374151" />
+            <Ionicons name="arrow-back" size={wp('5%')} color={colors.text} />
           </TouchableOpacity>
-          <View>
-            <Text className="text-3xl font-bold text-gray-900 mb-2">{edit === 'true' ? config.title.replace('Create', 'Edit') : config.title}</Text>
-            <Text className="text-gray-600 text-sm mt-1">{config.subtitle}</Text>
+          <View style={styles.headerContent}>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>
+              {edit === 'true' ? config.title.replace('Create', 'Edit') : config.title}
+            </Text>
+            <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>{config.subtitle}</Text>
           </View>
         </View>
       </View>
 
-      <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Preview Card */}
-        <View className="px-4 py-6 bg-gray-100">
-          <Text className="text-gray-900 font-bold text-2xl mb-6 text-center">CARD PREVIEW</Text>
+        <View style={[styles.previewSection, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.previewTitle, { color: colors.text }]}>CARD PREVIEW</Text>
           
-          {/* Business Card Container with 1.75 aspect ratio */}
-          <View className="items-center">
-            <View 
-              className="bg-white rounded-2xl shadow-2xl border border-gray-200"
-              style={{
-                width: '90%',
-                maxWidth: 350,
-                aspectRatio: 1.75,
-                padding: 20,
-              }}
-            >
+          <View style={styles.cardContainer}>
+            <View style={[styles.card, { backgroundColor: colors.card, borderColor: config.color, elevation: isDarkMode ? 0 : 5 }]}>
               {/* Card Content */}
-              <View className="flex-1 justify-between">
+              <View style={styles.cardContent}>
                 {/* Header Section */}
-                <View className="flex-row items-start">
-                  <View className={`w-12 h-12 bg-${config.color} rounded-xl items-center justify-center mr-3 shadow-sm`}>
-                    <Ionicons name={config.icon as any} size={20} color="#FFFFFF" />
+                <View style={styles.cardHeader}>
+                  <View style={[styles.cardIcon, { backgroundColor: config.color }]}>
+                    <Ionicons name={config.icon as any} size={wp('5%')} color="#FFFFFF" />
                   </View>
-                  <View className="flex-1">
-                    <Text className="text-gray-900 font-bold text-lg leading-tight" numberOfLines={2}>
+                  <View style={styles.cardHeaderText}>
+                    <Text style={[styles.cardName, { color: colors.text }]} numberOfLines={2}>
                       {formData.fullName || 'Your Full Name'}
                     </Text>
-                    <Text className={`text-${config.color.replace('-500', '-600')} text-sm font-semibold mt-1`} numberOfLines={1}>
+                    <Text style={[styles.cardPosition, { color: config.color }]} numberOfLines={1}>
                       {formData.field2 || config.field2Placeholder}
                     </Text>
-                    <Text className="text-gray-600 text-xs mt-0.5" numberOfLines={1}>
+                    <Text style={[styles.cardCompany, { color: colors.textSecondary }]} numberOfLines={1}>
                       {formData.field1 || config.field1Placeholder}
                     </Text>
                   </View>
                 </View>
 
                 {/* Bio Section */}
-                <View className="my-3">
-                  <Text className="text-gray-700 text-xs leading-4" numberOfLines={3}>
+                <View style={styles.cardBio}>
+                  <Text style={[styles.cardBioText, { color: colors.textSecondary }]} numberOfLines={3}>
                     {formData.bio || 'Your professional summary and expertise will appear here...'}
                   </Text>
                 </View>
 
                 {/* Contact Section */}
-                <View className="border-t border-gray-200 pt-2">
-                  <Text className="text-gray-800 text-xs mb-1" numberOfLines={1}>
+                <View style={[styles.cardContact, { borderTopColor: colors.border }]}>
+                  <Text style={[styles.contactText, { color: colors.text }]} numberOfLines={1}>
                     📧 {formData.email || 'your@email.com'}
                   </Text>
-                  <Text className="text-gray-800 text-xs" numberOfLines={1}>
+                  <Text style={[styles.contactText, { color: colors.text }]} numberOfLines={1}>
                     📱 {formData.phone || '+1 (555) 123-4567'}
                   </Text>
                 </View>
@@ -377,140 +364,142 @@ export default function CreateCardScreen() {
         </View>
 
         {/* Form */}
-        <View className="px-6 pb-8">
-          <Text className="text-gray-800 font-bold text-xl mb-6">{cardType === 'business' ? '💼' : cardType === 'traveller' ? '✈️' : '👥'} {config.title.replace('Create Your ', '')}</Text>
+        <View style={styles.formSection}>
+          <Text style={[styles.formTitle, { color: colors.text }]}>
+            {cardType === 'business' ? '💼' : cardType === 'traveller' ? '✈️' : '👥'} {config.title.replace('Create Your ', '')}
+          </Text>
 
           {/* Full Name */}
-          <View className="mb-4">
-            <Text className="text-gray-700 font-medium mb-2">Full Name</Text>
-            <View className={`bg-white rounded-xl border-2 ${errors.fullName ? 'border-red-300' : 'border-gray-200'} px-4 py-3 shadow-sm`}>
+          <View style={styles.inputGroup}>
+            <Text style={[styles.inputLabel, { color: colors.text }]}>Full Name</Text>
+            <View style={[styles.inputContainer, { backgroundColor: colors.card, borderColor: colors.border }, errors.fullName && styles.inputError]}>
               <TextInput
                 value={formData.fullName}
                 onChangeText={(text) => updateField('fullName', text)}
                 placeholder="Enter your professional name"
-                placeholderTextColor="#9CA3AF"
-                className="text-gray-900 text-base"
+                placeholderTextColor={colors.textSecondary}
+                style={[styles.textInput, { color: colors.text }]}
               />
             </View>
             {errors.fullName && (
-              <Text className="text-red-500 text-sm mt-1">{errors.fullName}</Text>
+              <Text style={styles.errorText}>{errors.fullName}</Text>
             )}
           </View>
 
           {/* Email */}
-          <View className="mb-4">
-            <Text className="text-gray-700 font-medium mb-2">Business Email</Text>
-            <View className={`bg-white rounded-xl border-2 ${errors.email ? 'border-red-300' : 'border-gray-200'} px-4 py-3 shadow-sm`}>
+          <View style={styles.inputGroup}>
+            <Text style={[styles.inputLabel, { color: colors.text }]}>Email</Text>
+            <View style={[styles.inputContainer, { backgroundColor: colors.card, borderColor: colors.border }, errors.email && styles.inputError]}>
               <TextInput
                 value={formData.email}
                 onChangeText={(text) => updateField('email', text)}
                 placeholder="your.name@company.com"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={colors.textSecondary}
                 keyboardType="email-address"
                 autoCapitalize="none"
-                className="text-gray-900 text-base"
+                style={[styles.textInput, { color: colors.text }]}
               />
             </View>
             {errors.email && (
-              <Text className="text-red-500 text-sm mt-1">{errors.email}</Text>
+              <Text style={styles.errorText}>{errors.email}</Text>
             )}
           </View>
 
           {/* Phone */}
-          <View className="mb-4">
-            <Text className="text-gray-700 font-medium mb-2">Business Phone</Text>
-            <View className={`bg-white rounded-xl border-2 ${errors.phone ? 'border-red-300' : 'border-gray-200'} px-4 py-3 shadow-sm`}>
+          <View style={styles.inputGroup}>
+            <Text style={[styles.inputLabel, { color: colors.text }]}>Phone</Text>
+            <View style={[styles.inputContainer, { backgroundColor: colors.card, borderColor: colors.border }, errors.phone && styles.inputError]}>
               <TextInput
                 value={formData.phone}
                 onChangeText={(text) => updateField('phone', text)}
                 placeholder="+1 (555) 123-4567"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={colors.textSecondary}
                 keyboardType="phone-pad"
-                className="text-gray-900 text-base"
+                style={[styles.textInput, { color: colors.text }]}
               />
             </View>
             {errors.phone && (
-              <Text className="text-red-500 text-sm mt-1">{errors.phone}</Text>
+              <Text style={styles.errorText}>{errors.phone}</Text>
             )}
           </View>
 
           {/* Field 1 */}
-          <View className="mb-4">
-            <Text className="text-gray-700 font-medium mb-2">{config.field1Label}</Text>
-            <View className={`bg-white rounded-xl border-2 ${errors.field1 ? 'border-red-300' : 'border-gray-200'} px-4 py-3 shadow-sm`}>
+          <View style={styles.inputGroup}>
+            <Text style={[styles.inputLabel, { color: colors.text }]}>{config.field1Label}</Text>
+            <View style={[styles.inputContainer, { backgroundColor: colors.card, borderColor: colors.border }, errors.field1 && styles.inputError]}>
               <TextInput
                 value={formData.field1}
                 onChangeText={(text) => updateField('field1', text)}
                 placeholder={config.field1Placeholder}
-                placeholderTextColor="#9CA3AF"
-                className="text-gray-900 text-base"
+                placeholderTextColor={colors.textSecondary}
+                style={[styles.textInput, { color: colors.text }]}
               />
             </View>
             {errors.field1 && (
-              <Text className="text-red-500 text-sm mt-1">{errors.field1}</Text>
+              <Text style={styles.errorText}>{errors.field1}</Text>
             )}
           </View>
 
           {/* Field 2 */}
-          <View className="mb-4">
-            <Text className="text-gray-700 font-medium mb-2">{config.field2Label}</Text>
-            <View className={`bg-white rounded-xl border-2 ${errors.field2 ? 'border-red-300' : 'border-gray-200'} px-4 py-3 shadow-sm`}>
+          <View style={styles.inputGroup}>
+            <Text style={[styles.inputLabel, { color: colors.text }]}>{config.field2Label}</Text>
+            <View style={[styles.inputContainer, { backgroundColor: colors.card, borderColor: colors.border }, errors.field2 && styles.inputError]}>
               <TextInput
                 value={formData.field2}
                 onChangeText={(text) => updateField('field2', text)}
                 placeholder={config.field2Placeholder}
-                placeholderTextColor="#9CA3AF"
-                className="text-gray-900 text-base"
+                placeholderTextColor={colors.textSecondary}
+                style={[styles.textInput, { color: colors.text }]}
               />
             </View>
             {errors.field2 && (
-              <Text className="text-red-500 text-sm mt-1">{errors.field2}</Text>
+              <Text style={styles.errorText}>{errors.field2}</Text>
             )}
           </View>
 
           {/* Bio */}
-          <View className="mb-6">
-            <Text className="text-gray-700 font-medium mb-2">{config.bioLabel}</Text>
-            <View className={`bg-white rounded-xl border-2 ${errors.bio ? 'border-red-300' : 'border-gray-200'} px-4 py-3 shadow-sm`}>
+          <View style={styles.inputGroup}>
+            <Text style={[styles.inputLabel, { color: colors.text }]}>{config.bioLabel}</Text>
+            <View style={[styles.inputContainer, styles.textAreaContainer, { backgroundColor: colors.card, borderColor: colors.border }, errors.bio && styles.inputError]}>
               <TextInput
                 value={formData.bio}
                 onChangeText={(text) => updateField('bio', text)}
                 placeholder={config.bioPlaceholder}
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={colors.textSecondary}
                 multiline
                 numberOfLines={4}
                 textAlignVertical="top"
-                className="text-gray-900 text-base min-h-[100px]"
+                style={[styles.textInput, styles.textArea, { color: colors.text }]}
               />
             </View>
-            <Text className="text-gray-500 text-xs mt-1">
+            <Text style={[styles.characterCount, { color: colors.textSecondary }]}>
               {formData.bio.length}/300 characters
             </Text>
             {errors.bio && (
-              <Text className="text-red-500 text-sm mt-1">{errors.bio}</Text>
+              <Text style={styles.errorText}>{errors.bio}</Text>
             )}
           </View>
 
           {/* Submit Button */}
-          <View className="bg-white p-4 rounded-2xl shadow-lg border-2 border-blue-500 mb-4">
+          <View style={[styles.submitSection, { backgroundColor: colors.card }]}> 
             <TouchableOpacity
               onPress={handleSubmit}
               disabled={isLoading}
-              className={`${config.color === 'blue-500' ? 'bg-blue-600 border-blue-700' : config.color === 'green-500' ? 'bg-green-600 border-green-700' : 'bg-purple-600 border-purple-700'} rounded-2xl py-6 px-8 shadow-2xl border-2 ${
-                isLoading ? 'opacity-70' : ''
-              }`}
+              style={[styles.submitButton, { backgroundColor: config.color }, isLoading && styles.submitButtonDisabled]}
               activeOpacity={0.8}
             >
-              <View className="flex-row items-center justify-center">
+              <View style={styles.submitButtonContent}>
                 {isLoading ? (
                   <>
-                    <View className="w-6 h-6 border-3 border-white/30 border-t-white rounded-full animate-spin mr-3" />
-                    <Text className="text-white font-bold text-xl">Creating Card...</Text>
+                    <ActivityIndicator size="small" color="white" style={styles.submitSpinner} />
+                    <Text style={styles.submitButtonText}>Creating Card...</Text>
                   </>
                 ) : (
                   <>
-                    <Ionicons name={config.icon as any} size={24} color="white" />
-                    <Text className="text-white font-bold text-xl ml-3">{isEditMode ? `UPDATE ${config.buttonText.split(' ')[1]} ${config.buttonText.split(' ')[2]}` : config.buttonText}</Text>
+                    <Ionicons name={config.icon as any} size={wp('5%')} color="white" />
+                    <Text style={styles.submitButtonText}>
+                      {isEditMode ? `UPDATE ${config.buttonText.split(' ')[1]} ${config.buttonText.split(' ')[2]}` : config.buttonText}
+                    </Text>
                   </>
                 )}
               </View>
@@ -518,12 +507,14 @@ export default function CreateCardScreen() {
           </View>
 
           {/* Tips */}
-          <View className={`mt-6 bg-${config.color.replace('-500', '-50')} rounded-xl p-4 border border-${config.color.replace('-500', '-200')}`}>
-            <View className="flex-row items-center mb-3">
-              <Ionicons name="bulb" size={18} color={config.color === 'blue-500' ? '#3B82F6' : config.color === 'green-500' ? '#10B981' : '#8B5CF6'} />
-              <Text className={`text-${config.color.replace('-500', '-800')} font-semibold text-base ml-2`}>{cardType === 'business' ? 'Professional' : cardType === 'traveller' ? 'Travel' : 'Social'} Tips</Text>
+          <View style={[styles.tipsSection, { backgroundColor: config.color + '10', borderColor: config.color + '30' }]}>
+            <View style={styles.tipsHeader}>
+              <Ionicons name="bulb" size={wp('4.5%')} color={config.color} />
+              <Text style={[styles.tipsTitle, { color: config.color }]}>
+                {cardType === 'business' ? 'Professional' : cardType === 'traveller' ? 'Travel' : 'Social'} Tips
+              </Text>
             </View>
-            <Text className={`text-${config.color.replace('-500', '-700')} text-sm leading-6`}>
+            <Text style={[styles.tipsText, { color: config.color }]}>
               {config.tips.join('\n')}
             </Text>
           </View>
@@ -532,3 +523,243 @@ export default function CreateCardScreen() {
     </KeyboardAvoidingView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+  },
+  loadingText: {
+    marginTop: hp('2%'),
+    fontSize: wp('4%'),
+    color: '#6B7280',
+  },
+  header: {
+    backgroundColor: '#FFFFFF',
+    paddingTop: hp('6%'),
+    paddingBottom: hp('2%'),
+    paddingHorizontal: wp('4%'),
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  backButton: {
+    width: wp('10%'),
+    height: wp('10%'),
+    backgroundColor: '#F1F5F9',
+    borderRadius: wp('5%'),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: wp('4%'),
+  },
+  headerContent: {
+    flex: 1,
+  },
+  headerTitle: {
+    fontSize: wp('5.5%'),
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: hp('0.5%'),
+  },
+  headerSubtitle: {
+    fontSize: wp('3.5%'),
+    color: '#64748B',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  previewSection: {
+    paddingHorizontal: wp('4%'),
+    paddingVertical: hp('3%'),
+    backgroundColor: '#F1F5F9',
+  },
+  previewTitle: {
+    fontSize: wp('5%'),
+    fontWeight: '700',
+    color: '#1E293B',
+    textAlign: 'center',
+    marginBottom: hp('3%'),
+  },
+  cardContainer: {
+    alignItems: 'center',
+  },
+  card: {
+    width: '90%',
+    maxWidth: 350,
+    aspectRatio: 1.75,
+    backgroundColor: '#FFFFFF',
+    borderRadius: wp('4%'),
+    padding: wp('5%'),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
+    borderWidth: 2,
+  },
+  cardContent: {
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  cardIcon: {
+    width: wp('12%'),
+    height: wp('12%'),
+    borderRadius: wp('6%'),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: wp('3%'),
+  },
+  cardHeaderText: {
+    flex: 1,
+  },
+  cardName: {
+    fontSize: wp('4.5%'),
+    fontWeight: '700',
+    color: '#1E293B',
+    lineHeight: wp('5.5%'),
+  },
+  cardPosition: {
+    fontSize: wp('3.5%'),
+    fontWeight: '600',
+    marginTop: hp('0.5%'),
+  },
+  cardCompany: {
+    fontSize: wp('3%'),
+    color: '#64748B',
+    marginTop: hp('0.2%'),
+  },
+  cardBio: {
+    marginVertical: hp('1.5%'),
+  },
+  cardBioText: {
+    fontSize: wp('3%'),
+    color: '#374151',
+    lineHeight: wp('4%'),
+  },
+  cardContact: {
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    paddingTop: hp('1%'),
+  },
+  contactText: {
+    fontSize: wp('3%'),
+    color: '#1E293B',
+    marginBottom: hp('0.3%'),
+  },
+  formSection: {
+    paddingHorizontal: wp('4%'),
+    paddingBottom: hp('4%'),
+  },
+  formTitle: {
+    fontSize: wp('5%'),
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: hp('3%'),
+  },
+  inputGroup: {
+    marginBottom: hp('2.5%'),
+  },
+  inputLabel: {
+    fontSize: wp('4%'),
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: hp('1%'),
+  },
+  inputContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: wp('3%'),
+    borderWidth: 2,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: wp('4%'),
+    paddingVertical: hp('1.5%'),
+  },
+  inputError: {
+    borderColor: '#EF4444',
+  },
+  textInput: {
+    fontSize: wp('4%'),
+    color: '#1E293B',
+  },
+  textAreaContainer: {
+    minHeight: hp('12%'),
+  },
+  textArea: {
+    minHeight: hp('10%'),
+  },
+  characterCount: {
+    fontSize: wp('3%'),
+    color: '#6B7280',
+    marginTop: hp('0.5%'),
+  },
+  errorText: {
+    fontSize: wp('3.5%'),
+    color: '#EF4444',
+    marginTop: hp('0.5%'),
+  },
+  submitSection: {
+    backgroundColor: '#FFFFFF',
+    padding: wp('4%'),
+    borderRadius: wp('4%'),
+    marginBottom: hp('2%'),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  submitButton: {
+    borderRadius: wp('4%'),
+    paddingVertical: hp('2%'),
+    paddingHorizontal: wp('6%'),
+  },
+  submitButtonDisabled: {
+    opacity: 0.7,
+  },
+  submitButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  submitSpinner: {
+    marginRight: wp('3%'),
+  },
+  submitButtonText: {
+    color: '#FFFFFF',
+    fontSize: wp('4.5%'),
+    fontWeight: '700',
+    marginLeft: wp('2%'),
+  },
+  tipsSection: {
+    marginTop: hp('3%'),
+    borderRadius: wp('3%'),
+    padding: wp('4%'),
+    borderWidth: 1,
+  },
+  tipsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: hp('1.5%'),
+  },
+  tipsTitle: {
+    fontSize: wp('4%'),
+    fontWeight: '600',
+    marginLeft: wp('2%'),
+  },
+  tipsText: {
+    fontSize: wp('3.5%'),
+    lineHeight: wp('5%'),
+  },
+});
