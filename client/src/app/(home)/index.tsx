@@ -20,7 +20,7 @@ export default function Page() {
   const [dataLoaded, setDataLoaded] = useState(false);
 
   const navigateToSettings = () => {
-    router.push('/settings');
+    router.push('/settings/index');
   };
 
   // Simulate data loading

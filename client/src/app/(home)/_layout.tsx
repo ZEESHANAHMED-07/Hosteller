@@ -6,7 +6,7 @@ export default function HomeLayout() {
 
   if (loading) return null;
   if (!user) return <Redirect href="/(auth)/sign-in" />;
-  if (user && !user.emailVerified) return <Redirect href="/(auth)/verify" />;
+  if (user && !user.emailVerified) return <Redirect href="/verify" />;
 
   return (
     <Stack screenOptions={{ headerShown: false }}>

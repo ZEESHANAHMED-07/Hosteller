@@ -6,15 +6,11 @@ export default function SettingsLayout() {
 
   if (loading) return null;
   if (!user) return <Redirect href="/(auth)/sign-in" />;
-  if (user && !user.emailVerified) return <Redirect href="/(auth)/verify" />;
+  if (user && !user.emailVerified) return <Redirect href="/verify" />;
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />
-      <Stack.Screen name="edit-profile" />
-      <Stack.Screen name="privacy-policy" />
-      <Stack.Screen name="terms-of-service" />
-      <Stack.Screen name="help-center" />
     </Stack>
   );
 }
