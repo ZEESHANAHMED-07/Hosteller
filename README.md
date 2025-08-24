@@ -60,25 +60,6 @@ EAS (Expo Application Services)
 
 ESLint, TypeScript
 
-📂 Project Structure
-Hosteller-main/
-├── client/                 # React Native (Expo) mobile app
-│   ├── src/                # Application source code
-│   ├── assets/             # Images, icons, lottie animations
-│   ├── constants/          # Global constants
-│   ├── scripts/            # Utility scripts
-│   ├── app.json            # Expo app config
-│   ├── tailwind.config.js  # Tailwind/NativeWind styling
-│   └── tsconfig.json       # TypeScript config
-│
-├── server/                 # Backend (Express.js + Firebase)
-│   ├── index.js            # Entry point
-│   └── package.json        # Backend dependencies
-│
-├── package.json            # Root dependencies (if any)
-├── eas.json                # Expo build config
-└── .gitignore
-
 ⚡ Installation & Setup
 Prerequisites
 
@@ -103,20 +84,6 @@ cd ../client
 npm install
 npx expo start
 
-
-🤝 Contributing
-
-Contributions are welcome!
-
-Fork the repo
-
-Create a feature branch (git checkout -b feature/amazing-feature)
-
-Commit your changes (git commit -m 'Add new feature')
-
-Push to branch (git push origin feature/amazing-feature)
-
-Open a Pull Request
 
 📜 License
 
