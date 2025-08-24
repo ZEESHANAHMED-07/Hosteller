@@ -85,6 +85,9 @@ npm install
 npx expo start
 
 
+Scan the QR code with Expo Go to run the app on your device.
+
+
 📜 License
 
 Distributed under the MIT License. See LICENSE for more information.
