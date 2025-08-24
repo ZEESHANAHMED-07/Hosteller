@@ -60,33 +60,6 @@ EAS (Expo Application Services)
 
 ESLint, TypeScript
 
-⚡ Installation & Setup
-Prerequisites
-
-Node.js >= 18
-
-Firebase project (Firestore, Auth, Storage enabled)
-
-Expo Go (for testing on mobile)
-
-1. Clone the repo
-git clone https://github.com/yourusername/Hosteller.git
-cd Hosteller-main
-
-2. Setup Backend
-cd server
-npm install
-# configure Firebase credentials in .env or serviceAccountKey.json
-npm start
-
-3. Setup Client
-cd ../client
-npm install
-npx expo start
-
-
-Scan the QR code with Expo Go to run the app on your device.
-
 
 📜 License
 
